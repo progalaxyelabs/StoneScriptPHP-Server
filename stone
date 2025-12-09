@@ -138,44 +138,55 @@ if (isset($cmdInfo['handler'])) {
     switch ($cmdInfo['handler']) {
         case 'serve':
             $port = $args[0] ?? 9100;
-            $pidFile = ROOT_PATH . '/.stone-server.pid';
+            $pidFile = ROOT_PATH . "/.stone-server-$port.pid";
 
-            // Check if server is already running
+            // Check if server is already running on this port
             if (file_exists($pidFile)) {
                 $pid = (int) trim(file_get_contents($pidFile));
                 if (posix_kill($pid, 0)) {
-                    echo Color::yellow("Server is already running on PID $pid") . "\n";
-                    echo "Run 'php stone stop' to stop it first\n";
+                    echo Color::yellow("Server is already running on port $port (PID $pid)") . "\n";
+                    echo "Run 'php stone stop $port' to stop it first\n";
                     exit(1);
                 }
             }
 
             echo Color::green("Starting server on http://127.0.0.1:$port") . "\n";
-            echo "Run 'php stone stop' to stop the server\n\n";
+            echo "Run 'php stone stop $port' to stop the server\n\n";
 
-            // Start server in background and save PID
+            // Start server in background and save PID and port
             $command = sprintf('php -S 127.0.0.1:%d -t public > /dev/null 2>&1 & echo $!', $port);
             $pid = (int) trim(shell_exec($command));
-            file_put_contents($pidFile, $pid);
+            file_put_contents($pidFile, "$pid\n$port");
 
-            echo Color::green("Server started with PID $pid") . "\n";
+            echo Color::green("Server started with PID $pid on port $port") . "\n";
             break;
 
         case 'stop':
-            $pidFile = ROOT_PATH . '/.stone-server.pid';
+            $port = $args[0] ?? 9100;
+            $pidFile = ROOT_PATH . "/.stone-server-$port.pid";
 
             if (!file_exists($pidFile)) {
-                echo Color::yellow("No server is running") . "\n";
+                echo Color::yellow("No server is running on port $port") . "\n";
                 exit(0);
             }
 
-            $pid = (int) trim(file_get_contents($pidFile));
+            $data = trim(file_get_contents($pidFile));
+            list($pid, $savedPort) = explode("\n", $data);
+            $pid = (int) $pid;
 
             // Check if process is actually running
             if (!posix_kill($pid, 0)) {
                 echo Color::yellow("Server process (PID $pid) is not running") . "\n";
                 unlink($pidFile);
                 exit(0);
+            }
+
+            // Verify it's a PHP server process on the correct port
+            $cmdline = file_get_contents("/proc/$pid/cmdline");
+            if (strpos($cmdline, "php") === false || strpos($cmdline, "$port") === false) {
+                echo Color::yellow("PID $pid doesn't match expected server on port $port") . "\n";
+                unlink($pidFile);
+                exit(1);
             }
 
             // Kill the process
@@ -189,7 +200,7 @@ if (isset($cmdInfo['handler'])) {
             }
 
             unlink($pidFile);
-            echo Color::green("Server stopped (PID $pid)") . "\n";
+            echo Color::green("Server stopped (PID $pid on port $port)") . "\n";
             break;
 
         case 'test':
