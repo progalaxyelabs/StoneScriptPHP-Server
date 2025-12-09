@@ -57,6 +57,10 @@ $commands = [
         'description' => 'Start development server',
         'handler' => 'serve',
     ],
+    'stop' => [
+        'description' => 'Stop development server',
+        'handler' => 'stop',
+    ],
     'generate' => [
         'description' => 'Generate code (route, model, migration, etc.)',
         'file' => 'cli/generate-route.php', // Dispatcher
@@ -134,9 +138,58 @@ if (isset($cmdInfo['handler'])) {
     switch ($cmdInfo['handler']) {
         case 'serve':
             $port = $args[0] ?? 9100;
+            $pidFile = ROOT_PATH . '/.stone-server.pid';
+
+            // Check if server is already running
+            if (file_exists($pidFile)) {
+                $pid = (int) trim(file_get_contents($pidFile));
+                if (posix_kill($pid, 0)) {
+                    echo Color::yellow("Server is already running on PID $pid") . "\n";
+                    echo "Run 'php stone stop' to stop it first\n";
+                    exit(1);
+                }
+            }
+
             echo Color::green("Starting server on http://127.0.0.1:$port") . "\n";
-            echo "Press Ctrl+C to stop\n\n";
-            passthru("php -S 127.0.0.1:$port -t public");
+            echo "Run 'php stone stop' to stop the server\n\n";
+
+            // Start server in background and save PID
+            $command = sprintf('php -S 127.0.0.1:%d -t public > /dev/null 2>&1 & echo $!', $port);
+            $pid = (int) trim(shell_exec($command));
+            file_put_contents($pidFile, $pid);
+
+            echo Color::green("Server started with PID $pid") . "\n";
+            break;
+
+        case 'stop':
+            $pidFile = ROOT_PATH . '/.stone-server.pid';
+
+            if (!file_exists($pidFile)) {
+                echo Color::yellow("No server is running") . "\n";
+                exit(0);
+            }
+
+            $pid = (int) trim(file_get_contents($pidFile));
+
+            // Check if process is actually running
+            if (!posix_kill($pid, 0)) {
+                echo Color::yellow("Server process (PID $pid) is not running") . "\n";
+                unlink($pidFile);
+                exit(0);
+            }
+
+            // Kill the process
+            posix_kill($pid, SIGTERM);
+
+            // Wait a bit and check if it stopped
+            usleep(500000); // 0.5 seconds
+            if (posix_kill($pid, 0)) {
+                // Still running, force kill
+                posix_kill($pid, SIGKILL);
+            }
+
+            unlink($pidFile);
+            echo Color::green("Server stopped (PID $pid)") . "\n";
             break;
 
         case 'test':

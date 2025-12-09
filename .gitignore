@@ -52,3 +52,6 @@ Thumbs.db
 /dist/
 /build/
 /.cache/
+
+# Server PID
+.stone-server.pid
