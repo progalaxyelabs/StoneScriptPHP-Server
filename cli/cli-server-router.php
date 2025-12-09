@@ -3,7 +3,7 @@
 // Router for PHP built-in server
 
 // Define ROOT_PATH (go up two levels from Framework/cli)
-define('ROOT_PATH', dirname(__DIR__));
+if (!defined('ROOT_PATH')) define('ROOT_PATH', dirname(__DIR__));
 
 // Set JSON response headers
 header('Content-Type: application/json');

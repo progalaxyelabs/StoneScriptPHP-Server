@@ -14,8 +14,12 @@
  */
 
 // Determine the root path (go up one level from cli/)
-define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
-define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
+if (!defined('ROOT_PATH')) {
+    define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
+}
+if (!defined('SRC_PATH')) {
+    define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
+}
 
 // Check for help flag
 if ($argc === 1 || ($argc === 2 && in_array($argv[1], ['--help', '-h', 'help']))) {

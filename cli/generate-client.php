@@ -14,7 +14,7 @@
  */
 
 // Determine the root path (go up two levels from Framework/cli)
-define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
+if (!defined('ROOT_PATH')) define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
 define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
 
 // Auto-load Framework and App classes
