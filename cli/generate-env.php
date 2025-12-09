@@ -151,13 +151,13 @@ function generateEnvFile(string $filepath, bool $force, bool $is_example, array 
 
     $output = [];
 
-    // Header
-    $output[] = "# Environment Configuration";
-    $output[] = "# Generated: " . date('Y-m-d H:i:s');
-    $output[] = "#";
-    $output[] = "# This file contains environment-specific configuration.";
-    $output[] = "# DO NOT commit this file to version control!";
-    $output[] = "#";
+    // Header (using ; for comments as # causes parse_ini_file issues)
+    $output[] = "; Environment Configuration";
+    $output[] = "; Generated: " . date('Y-m-d H:i:s');
+    $output[] = ";";
+    $output[] = "; This file contains environment-specific configuration.";
+    $output[] = "; DO NOT commit this file to version control";
+    $output[] = ";";
     $output[] = "";
 
     // Group variables by prefix for better organization
@@ -165,15 +165,15 @@ function generateEnvFile(string $filepath, bool $force, bool $is_example, array 
 
     foreach ($groups as $prefix => $variables) {
         // Add group header
-        $output[] = "# " . str_repeat("=", 60);
-        $output[] = "# " . strtoupper(str_replace('_', ' ', $prefix)) . " Configuration";
-        $output[] = "# " . str_repeat("=", 60);
+        $output[] = "; " . str_repeat("=", 60);
+        $output[] = "; " . strtoupper(str_replace('_', ' ', $prefix)) . " Configuration";
+        $output[] = "; " . str_repeat("=", 60);
         $output[] = "";
 
         foreach ($variables as $key => $config) {
             // Add description as comment
             if (!empty($config['description'])) {
-                $output[] = "# " . $config['description'];
+                $output[] = "; " . $config['description'];
             }
 
             // Add type and requirement info
@@ -183,14 +183,14 @@ function generateEnvFile(string $filepath, bool $force, bool $is_example, array 
             } else {
                 $info .= " | Optional";
             }
-            $output[] = "# $info";
+            $output[] = "; $info";
 
             // Determine the value to use
             $value = determineValue($key, $config, $existing_values, $force, $is_example);
 
             // Format the line
             if ($value === null || $value === '') {
-                $output[] = "# $key=";
+                $output[] = "; $key=";
             } else {
                 // Escape special characters in value
                 $escaped_value = escapeEnvValue($value);
