@@ -17,11 +17,9 @@ date_default_timezone_set('UTC');
 define('ROOT_PATH', realpath(__DIR__ . '/../') . DIRECTORY_SEPARATOR);
 define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
 define('CONFIG_PATH', SRC_PATH . 'config' . DIRECTORY_SEPARATOR);
-define('FRAMEWORK_PATH', ROOT_PATH . 'Framework' . DIRECTORY_SEPARATOR);
 
-// Load framework
-require_once FRAMEWORK_PATH . 'Env.php';
-require_once FRAMEWORK_PATH . 'Migrations.php';
+// Load composer autoloader
+require_once ROOT_PATH . 'vendor/autoload.php';
 
 use Framework\Migrations;
 use Framework\Env;
