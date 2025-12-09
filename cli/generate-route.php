@@ -21,6 +21,10 @@ if (!defined('SRC_PATH')) {
     define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
 }
 
+// Use $_SERVER['argv'] which may be modified by stone binary
+$argv = $_SERVER['argv'];
+$argc = $_SERVER['argc'];
+
 // Check for help flag
 if ($argc === 1 || ($argc === 2 && in_array($argv[1], ['--help', '-h', 'help']))) {
     echo "Route Generator\n";
@@ -43,7 +47,8 @@ if ($argc === 1 || ($argc === 2 && in_array($argv[1], ['--help', '-h', 'help']))
 }
 
 if ($argc !== 3) {
-    echo "Error: Invalid number of arguments\n";
+    echo "Error: Invalid number of arguments (got $argc)\n";
+    echo "Arguments: " . implode(', ', $argv) . "\n";
     echo "Usage: php generate route <method> <path>\n";
     echo "Run 'php generate route --help' for more information.\n";
     exit(1);
