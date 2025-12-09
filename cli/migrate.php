@@ -14,12 +14,20 @@
 // Set up paths
 define('INDEX_START_TIME', microtime(true));
 date_default_timezone_set('UTC');
-define('ROOT_PATH', realpath(__DIR__ . '/../') . DIRECTORY_SEPARATOR);
-define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
-define('CONFIG_PATH', SRC_PATH . 'config' . DIRECTORY_SEPARATOR);
+if (!defined('ROOT_PATH')) {
+    define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
+}
+// Ensure ROOT_PATH has trailing separator
+$rootPath = rtrim(ROOT_PATH, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+if (!defined('SRC_PATH')) {
+    define('SRC_PATH', $rootPath . 'src' . DIRECTORY_SEPARATOR);
+}
+if (!defined('CONFIG_PATH')) {
+    define('CONFIG_PATH', $rootPath . 'src' . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR);
+}
 
 // Load composer autoloader
-require_once ROOT_PATH . 'vendor/autoload.php';
+require_once $rootPath . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
 use Framework\Migrations;
 use Framework\Env;
