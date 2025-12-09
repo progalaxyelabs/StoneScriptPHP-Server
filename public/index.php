@@ -7,8 +7,11 @@ use Framework\Router;
 define('INDEX_START_TIME', microtime(true));
 define('ROOT_PATH', realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR);
 
-// Load composer autoloader (includes framework bootstrap via autoload files)
+// Load composer autoloader
 require_once ROOT_PATH . 'vendor/autoload.php';
+
+// Load framework bootstrap
+require_once ROOT_PATH . 'vendor/progalaxyelabs/stonescriptphp/bootstrap.php';
 
 enum RequestMethod : string {
     case get = 'GET';
