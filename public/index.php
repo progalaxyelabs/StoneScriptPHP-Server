@@ -3,14 +3,14 @@
 use Framework\Logger;
 use Framework\Router;
 
-// Define constants
+// Define constants BEFORE loading composer autoloader
 define('INDEX_START_TIME', microtime(true));
 define('ROOT_PATH', realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR);
 
 // Load composer autoloader
 require_once ROOT_PATH . 'vendor/autoload.php';
 
-// Load framework bootstrap
+// Manually load framework bootstrap (not in composer autoload.files yet)
 require_once ROOT_PATH . 'vendor/progalaxyelabs/stonescriptphp/bootstrap.php';
 
 enum RequestMethod : string {
