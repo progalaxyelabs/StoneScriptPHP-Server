@@ -36,7 +36,7 @@ use Framework\Env;
 $command = $argv[1] ?? 'help';
 
 // Allow help command without .env file
-if ($command !== 'help' && !file_exists(ROOT_PATH . '.env')) {
+if ($command !== 'help' && !file_exists($rootPath . '.env')) {
     echo "Error: .env file not found. Please create it from the 'env' template.\n";
     echo "Run 'php migrate.php help' for usage information.\n";
     exit(1);
