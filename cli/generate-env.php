@@ -137,7 +137,18 @@ function parseEnvFile(string $filepath): array
  */
 function generateEnvFile(string $filepath, bool $force, bool $is_example, array $existing_values = []): void
 {
-    $schema = \Framework\Env::getSchema();
+    // Get schema from an Env instance (or App\Env if it exists)
+    if (class_exists('App\\Env')) {
+        $envClass = 'App\\Env';
+    } else {
+        $envClass = 'Framework\\Env';
+    }
+
+    // Use reflection to instantiate without triggering .env file check
+    $reflectionClass = new \ReflectionClass($envClass);
+    $envInstance = $reflectionClass->newInstanceWithoutConstructor();
+    $schema = $envInstance->getSchema();
+
     $output = [];
 
     // Header
