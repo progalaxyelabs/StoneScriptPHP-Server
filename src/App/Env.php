@@ -32,7 +32,7 @@ class Env extends FrameworkEnv
     /**
      * Override getSchema to merge application-specific variables with framework variables
      */
-    public static function getSchema(): array
+    public function getSchema(): array
     {
         // Get parent schema (framework variables)
         $parentSchema = parent::getSchema();
