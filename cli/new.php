@@ -54,7 +54,7 @@ class ProjectGenerator
 
     public function __construct(array $argv)
     {
-        $this->frameworkPath = dirname(__DIR__, 2);
+        $this->frameworkPath = dirname(__DIR__);
         $this->parseArguments($argv);
     }
 

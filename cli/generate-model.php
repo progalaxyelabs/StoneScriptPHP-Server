@@ -13,7 +13,7 @@
  */
 
 // Determine the root path (go up two levels from Framework/cli)
-define('ROOT_PATH', dirname(__DIR__, 2) . DIRECTORY_SEPARATOR);
+define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
 
 // Check for help flag
 if ($argc === 1 || ($argc === 2 && in_array($argv[1], ['--help', '-h', 'help']))) {

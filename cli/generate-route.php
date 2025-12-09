@@ -13,8 +13,8 @@
  *   php generate route get /items/{itemId}/update-stock
  */
 
-// Determine the root path (go up two levels from Framework/cli)
-define('ROOT_PATH', dirname(__DIR__, 2) . DIRECTORY_SEPARATOR);
+// Determine the root path (go up one level from cli/)
+define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
 define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
 
 // Check for help flag
