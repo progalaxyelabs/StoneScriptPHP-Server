@@ -78,11 +78,14 @@ if (!str_starts_with($path, '/')) {
 
 /**
  * Convert path to class name base
- * /login -> Login
- * /items/{itemId}/view -> ItemsView
- * /users/{userId}/posts/{postId} -> UsersPostsView
+ * Always prefixes with HTTP method for consistent naming:
+ * GET /api/todos -> GetApiTodos
+ * POST /api/todos -> PostApiTodos
+ * PUT /api/todos/{id} -> PutApiTodos
+ * DELETE /api/todos/{id} -> DeleteApiTodos
+ * GET /items/{itemId}/view -> GetItemsView
  */
-function pathToClassName(string $path): string {
+function pathToClassName(string $path, string $method): string {
     // Remove leading/trailing slashes
     $path = trim($path, '/');
 
@@ -105,6 +108,9 @@ function pathToClassName(string $path): string {
     if (empty($className)) {
         $className = 'Index';
     }
+
+    // Always prefix with HTTP method for consistent naming
+    $className = ucfirst(strtolower($method)) . $className;
 
     return $className;
 }
@@ -130,7 +136,7 @@ function normalizePathParams(string $path): string {
 $path = normalizePathParams($path);
 
 // Generate class names
-$baseClassName = pathToClassName($path);
+$baseClassName = pathToClassName($path, $method);
 $routeClassName = $baseClassName . 'Route';
 $interfaceName = 'I' . $baseClassName . 'Route';
 $requestClassName = $baseClassName . 'Request';
