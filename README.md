@@ -61,6 +61,18 @@ To test changes without publishing to Packagist, use composer's path repository:
 
 Then run `composer install` to use your local framework code.
 
+## Versioning Strategy
+
+StoneScriptPHP follows [Semantic Versioning](https://semver.org/):
+
+- **Patch versions (2.0.x)**: Bug fixes, security patches, minor improvements. Safe to update anytime.
+- **Minor versions (2.x.0)**: New features, backward-compatible changes. Update when you need new functionality.
+- **Major versions (x.0.0)**: Breaking changes, major architectural updates. Review migration guide before updating.
+
+The server and framework are versioned together during major releases but may have different patch versions as bugs are fixed independently. This server's `composer.json` uses `^2.0` to automatically receive framework patch updates while staying on the same major version.
+
+**Current stable:** v2.0.x - Production-ready with ongoing bug fixes
+
 ## Documentation
 
 - **[Getting Started Guide](https://stonescriptphp.org/docs/getting-started)** - Complete tutorial
