@@ -13,17 +13,17 @@ $isVendorMode = strpos(__DIR__, 'vendor/progalaxyelabs/stonescriptphp') !== fals
 if ($isVendorMode) {
     // Installed via composer require - running from vendor/bin/stone
     $vendorDir = dirname(dirname(__DIR__));
-    define('ROOT_PATH', dirname($vendorDir));
+    define('ROOT_PATH', dirname($vendorDir) . DIRECTORY_SEPARATOR);
     define('FRAMEWORK_PATH', __DIR__ . '/Framework');
     define('IS_VENDOR_MODE', true);
 } else {
     // Installed via composer create-project - running from project root
-    define('ROOT_PATH', __DIR__);
-    define('FRAMEWORK_PATH', ROOT_PATH . '/Framework');
+    define('ROOT_PATH', __DIR__ . DIRECTORY_SEPARATOR);
+    define('FRAMEWORK_PATH', ROOT_PATH . 'Framework');
     define('IS_VENDOR_MODE', false);
 }
 
-require_once ($isVendorMode ? $vendorDir : ROOT_PATH) . '/vendor/autoload.php';
+require_once ($isVendorMode ? $vendorDir : ROOT_PATH) . 'vendor/autoload.php';
 
 // CLI Colors
 class Color {
