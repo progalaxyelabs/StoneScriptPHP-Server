@@ -113,11 +113,11 @@ class Setup {
 
         // Database
         echo "\n📊 Database Configuration:\n";
-        $config['DB_HOST'] = $this->ask('Database host', 'localhost');
-        $config['DB_PORT'] = $this->ask('Database port', '5432');
-        $config['DB_NAME'] = $this->ask('Database name', strtolower(str_replace(' ', '_', $config['APP_NAME'])));
-        $config['DB_USER'] = $this->ask('Database user', 'postgres');
-        $config['DB_PASS'] = $this->ask('Database password', '', true);
+        $config['DATABASE_HOST'] = $this->ask('Database host', 'localhost');
+        $config['DATABASE_PORT'] = $this->ask('Database port', '5432');
+        $config['DATABASE_DBNAME'] = $this->ask('Database name', strtolower(str_replace(' ', '_', $config['APP_NAME'])));
+        $config['DATABASE_USER'] = $this->ask('Database user', 'postgres');
+        $config['DATABASE_PASSWORD'] = $this->ask('Database password', '', true);
 
         // JWT
         echo "\n🔐 JWT Configuration:\n";
