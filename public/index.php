@@ -6,15 +6,20 @@ use Framework\Router;
 // Define constants BEFORE loading composer autoloader
 define('INDEX_START_TIME', microtime(true));
 define('ROOT_PATH', realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR);
-define('DEBUG_MODE', false);  // Will be redefined by Env after .env loads
+define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
+define('CONFIG_PATH', SRC_PATH . 'config' . DIRECTORY_SEPARATOR);
 
-// Load composer autoloader (includes functions.php but not bootstrap.php yet)
+// Temporary DEBUG_MODE until Env loads
+if (!defined('DEBUG_MODE')) {
+    define('DEBUG_MODE', ($_SERVER['DEBUG_MODE'] ?? 'false') === 'true');
+}
+
+// Load composer autoloader (includes functions.php via autoload.files)
 require_once ROOT_PATH . 'vendor/autoload.php';
 
-// Load framework bootstrap manually to initialize Env and other framework features
-// Note: This causes a warning about constants being redefined, but it's necessary
-// until bootstrap.php is added to composer autoload.files in the framework
-@include_once ROOT_PATH . 'vendor/progalaxyelabs/stonescriptphp/bootstrap.php';
+// Initialize Env (this will redefine DEBUG_MODE with value from .env)
+use Framework\Env;
+Env::get_instance();
 
 enum RequestMethod : string {
     case get = 'GET';
