@@ -12,7 +12,9 @@
  */
 
 // Set up paths
-define('INDEX_START_TIME', microtime(true));
+if (!defined('INDEX_START_TIME')) {
+    define('INDEX_START_TIME', microtime(true));
+}
 date_default_timezone_set('UTC');
 if (!defined('ROOT_PATH')) {
     define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
@@ -31,6 +33,11 @@ require_once $rootPath . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
 use Framework\Migrations;
 use Framework\Env;
+
+// Define DEBUG_MODE for CLI (defaults to false)
+if (!defined('DEBUG_MODE')) {
+    define('DEBUG_MODE', false);
+}
 
 // Use $_SERVER['argv'] which may be modified by stone binary
 $argv = $_SERVER['argv'];
