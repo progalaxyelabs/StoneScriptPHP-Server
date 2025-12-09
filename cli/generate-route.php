@@ -17,8 +17,12 @@
 if (!defined('ROOT_PATH')) {
     define('ROOT_PATH', dirname(__DIR__) . DIRECTORY_SEPARATOR);
 }
+// Ensure ROOT_PATH has trailing separator
+$rootPath = rtrim(ROOT_PATH, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 if (!defined('SRC_PATH')) {
-    define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
+    define('SRC_PATH', $rootPath . 'src' . DIRECTORY_SEPARATOR);
+} else {
+    $rootPath = rtrim(dirname(SRC_PATH), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
 }
 
 // Use $_SERVER['argv'] which may be modified by stone binary
