@@ -3,8 +3,12 @@
 use Framework\Logger;
 use Framework\Router;
 
-require __DIR__ . '/../Framework/bootstrap.php';
-require __DIR__ . '/../vendor/autoload.php';
+// Define constants
+define('INDEX_START_TIME', microtime(true));
+define('ROOT_PATH', realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR);
+
+// Load composer autoloader (includes framework bootstrap via autoload files)
+require_once ROOT_PATH . 'vendor/autoload.php';
 
 enum RequestMethod : string {
     case get = 'GET';
