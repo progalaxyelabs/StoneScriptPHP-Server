@@ -16,8 +16,8 @@ if ($isVendorMode) {
     require_once $vendorDir . '/autoload.php';
 } else {
     // Running from project root stone command
-    require_once __DIR__ . '/../../vendor/autoload.php';
-    $projectRoot = dirname(dirname(__DIR__));
+    require_once __DIR__ . '/../vendor/autoload.php';
+    $projectRoot = dirname(__DIR__);
 }
 
 class Init {

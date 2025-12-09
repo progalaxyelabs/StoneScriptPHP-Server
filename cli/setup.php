@@ -11,11 +11,6 @@ class Setup {
     {
         $this->printBanner();
 
-        // Template selection for fresh projects
-        if ($this->isEmptyProject()) {
-            $this->showTemplateSelection();
-        }
-
         $this->generateEnv();
         $this->generateKeys();
         $this->showNextSteps();

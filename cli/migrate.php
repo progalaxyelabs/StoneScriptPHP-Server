@@ -14,7 +14,7 @@
 // Set up paths
 define('INDEX_START_TIME', microtime(true));
 date_default_timezone_set('UTC');
-define('ROOT_PATH', realpath(__DIR__ . '/../../') . DIRECTORY_SEPARATOR);
+define('ROOT_PATH', realpath(__DIR__ . '/../') . DIRECTORY_SEPARATOR);
 define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
 define('CONFIG_PATH', SRC_PATH . 'config' . DIRECTORY_SEPARATOR);
 define('FRAMEWORK_PATH', ROOT_PATH . 'Framework' . DIRECTORY_SEPARATOR);
