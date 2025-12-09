@@ -32,6 +32,10 @@ require_once $rootPath . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 use Framework\Migrations;
 use Framework\Env;
 
+// Use $_SERVER['argv'] which may be modified by stone binary
+$argv = $_SERVER['argv'];
+$argc = $_SERVER['argc'];
+
 // Parse command line arguments
 $command = $argv[1] ?? 'help';
 
