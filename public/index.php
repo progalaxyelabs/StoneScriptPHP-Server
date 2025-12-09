@@ -6,12 +6,15 @@ use Framework\Router;
 // Define constants BEFORE loading composer autoloader
 define('INDEX_START_TIME', microtime(true));
 define('ROOT_PATH', realpath(__DIR__ . '/..') . DIRECTORY_SEPARATOR);
+define('DEBUG_MODE', false);  // Will be redefined by Env after .env loads
 
-// Load composer autoloader
+// Load composer autoloader (includes functions.php but not bootstrap.php yet)
 require_once ROOT_PATH . 'vendor/autoload.php';
 
-// Manually load framework bootstrap (not in composer autoload.files yet)
-require_once ROOT_PATH . 'vendor/progalaxyelabs/stonescriptphp/bootstrap.php';
+// Load framework bootstrap manually to initialize Env and other framework features
+// Note: This causes a warning about constants being redefined, but it's necessary
+// until bootstrap.php is added to composer autoload.files in the framework
+@include_once ROOT_PATH . 'vendor/progalaxyelabs/stonescriptphp/bootstrap.php';
 
 enum RequestMethod : string {
     case get = 'GET';
