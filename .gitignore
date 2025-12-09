@@ -1,13 +1,54 @@
+# Environment & Credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.pub
+*.key
+*-jwt.pem
+*-jwt.pub
+*credentials*
+*secret*
+
+# Dependencies
 /vendor/
-/.env
-/composer.lock
-/phpunit.xml
-/.phpunit.result.cache
+/node_modules/
+composer.lock
+
+# IDE & Editors
 /.idea/
 /.vscode/
-/node_modules/
+/.phpunit.cache/
+/.phpunit.result.cache
+/phpunit.xml
+*.swp
+*.swo
+*~
+
+# Logs
 *.log
+logs/*
+!logs/.gitkeep
 /storage/logs/*
 !/storage/logs/.gitkeep
+
+# Uploads & User Data
+/uploads/
 /public/uploads/*
 !/public/uploads/.gitkeep
+/storage/*
+!/storage/.gitkeep
+
+# Database
+*.sqlite
+*.db
+/postgresql-data/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Build & Cache
+/dist/
+/build/
+/.cache/

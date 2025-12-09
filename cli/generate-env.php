@@ -4,20 +4,32 @@
 /**
  * Environment File Generator
  *
- * Generates or updates .env file based on the schema defined in Framework/Env.php
+ * Generates or updates .env file based on the schema defined in Framework\Env class
  *
  * Usage:
- *   php Framework/cli/generate-env.php
- *   php Framework/cli/generate-env.php --force  (overwrites existing values with defaults)
+ *   php stone generate env
+ *   php stone generate env --force  (overwrites existing values with defaults)
  */
 
 // Determine the root path
-$root_path = dirname(__DIR__, 2);
+$root_path = dirname(__DIR__);
 $env_file_path = $root_path . DIRECTORY_SEPARATOR . '.env';
 $env_example_path = $root_path . DIRECTORY_SEPARATOR . '.env.example';
 
-// Load the Env class to get the schema
-require_once $root_path . DIRECTORY_SEPARATOR . 'Framework' . DIRECTORY_SEPARATOR . 'Env.php';
+// Load the Env class from vendor or autoloader
+if (file_exists($root_path . '/vendor/autoload.php')) {
+    require_once $root_path . '/vendor/autoload.php';
+} else {
+    echo "Error: vendor/autoload.php not found. Run: composer install\n";
+    exit(1);
+}
+
+// Try to load Env class
+if (!class_exists('Framework\\Env')) {
+    echo "Error: Framework\\Env class not found\n";
+    echo "Make sure StoneScriptPHP framework is installed via composer\n";
+    exit(1);
+}
 
 // Check for help flag
 if (in_array('--help', $argv ?? []) || in_array('-h', $argv ?? []) || in_array('help', $argv ?? [])) {
@@ -125,7 +137,7 @@ function parseEnvFile(string $filepath): array
  */
 function generateEnvFile(string $filepath, bool $force, bool $is_example, array $existing_values = []): void
 {
-    $schema = Framework\Env::getSchema();
+    $schema = \Framework\Env::getSchema();
     $output = [];
 
     // Header

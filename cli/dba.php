@@ -80,7 +80,15 @@ function handle_file_command($options)
         die(0);
     }
     echo 'file ok' . PHP_EOL;
-    include __DIR__ . '/../Framework/bootstrap.php';    
+
+    // Load autoloader
+    $autoloadPath = __DIR__ . '/../vendor/autoload.php';
+    if (!file_exists($autoloadPath)) {
+        echo "Error: vendor/autoload.php not found. Run: composer install\n";
+        exit(1);
+    }
+    require_once $autoloadPath;
+
     $sql = file_get_contents($filepath);
     echo $sql . PHP_EOL;
     $status = Database::query($sql);
@@ -100,7 +108,14 @@ function handle_query_command($options) {
         die(0);
     }
 
-    include __DIR__ . '/../Framework/bootstrap.php';    
+    // Load autoloader
+    $autoloadPath = __DIR__ . '/../vendor/autoload.php';
+    if (!file_exists($autoloadPath)) {
+        echo "Error: vendor/autoload.php not found. Run: composer install\n";
+        exit(1);
+    }
+    require_once $autoloadPath;
+
     $status = Database::query($statement);
     echo 'Executed. ' . $status . PHP_EOL;
     die(0);

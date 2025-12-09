@@ -83,6 +83,24 @@ $commands = [
 $command = $argv[1] ?? 'help';
 $args = array_slice($argv, 2);
 
+// Special handling for 'generate' with sub-commands
+if ($command === 'generate' && !empty($args)) {
+    $subCommand = $args[0];
+
+    // Check if it's an auth command (auth:google, auth:linkedin, etc.)
+    if (str_starts_with($subCommand, 'auth:')) {
+        $commands['generate']['file'] = 'cli/generate-auth.php';
+    } elseif ($subCommand === 'route' || str_starts_with($subCommand, 'route')) {
+        $commands['generate']['file'] = 'cli/generate-route.php';
+    } elseif ($subCommand === 'model') {
+        $commands['generate']['file'] = 'cli/generate-model.php';
+    } elseif ($subCommand === 'client') {
+        $commands['generate']['file'] = 'cli/generate-client.php';
+    } elseif ($subCommand === 'env') {
+        $commands['generate']['file'] = 'cli/generate-env.php';
+    }
+}
+
 // Show help
 if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo Color::blue("StoneScriptPHP CLI Tool") . "\n\n";
@@ -134,7 +152,13 @@ if (isset($cmdInfo['handler'])) {
 
 // Execute external CLI script
 if (isset($cmdInfo['file'])) {
-    $scriptPath = FRAMEWORK_PATH . '/' . $cmdInfo['file'];
+    // Try cli/ directory first (new structure)
+    $scriptPath = ROOT_PATH . '/' . $cmdInfo['file'];
+
+    // Fallback to old Framework path if needed
+    if (!file_exists($scriptPath) && defined('FRAMEWORK_PATH')) {
+        $scriptPath = FRAMEWORK_PATH . '/' . $cmdInfo['file'];
+    }
 
     if (!file_exists($scriptPath)) {
         echo Color::red("Error: Command script not found: $scriptPath") . "\n";
