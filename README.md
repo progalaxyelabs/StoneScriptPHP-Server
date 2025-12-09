@@ -61,6 +61,64 @@ To test changes without publishing to Packagist, use composer's path repository:
 
 Then run `composer install` to use your local framework code.
 
+## Accessing Environment Variables
+
+This server template extends the framework's Env class to add application-specific variables:
+
+```php
+use Framework\Env;
+
+$env = Env::get_instance();  // Returns App\Env instance
+
+// Framework variables (inherited from Framework\Env)
+$env->DEBUG_MODE;            // bool
+$env->TIMEZONE;              // string
+$env->DATABASE_HOST;         // string
+$env->DATABASE_PORT;         // int
+$env->DATABASE_USER;         // string
+$env->DATABASE_PASSWORD;     // string
+$env->DATABASE_DBNAME;       // string
+
+// Application-specific variables (from App\Env)
+$env->APP_NAME;              // string
+$env->APP_ENV;               // string
+$env->APP_PORT;              // int
+$env->JWT_PRIVATE_KEY_PATH;  // string
+$env->JWT_PUBLIC_KEY_PATH;   // string
+$env->JWT_EXPIRY;            // int
+$env->ALLOWED_ORIGINS;       // string
+$env->GOOGLE_CLIENT_ID;      // string (optional)
+```
+
+### Adding Custom Variables
+
+Edit `src/App/Env.php` to add your own variables:
+
+```php
+class Env extends FrameworkEnv
+{
+    public $YOUR_CUSTOM_VAR;
+
+    public function getSchema(): array
+    {
+        $parentSchema = parent::getSchema();
+
+        $appSchema = [
+            'YOUR_CUSTOM_VAR' => [
+                'type' => 'string',
+                'required' => false,
+                'default' => null,
+                'description' => 'Your custom variable'
+            ],
+        ];
+
+        return array_merge($parentSchema, $appSchema);
+    }
+}
+```
+
+Then add `YOUR_CUSTOM_VAR=value` to your `.env` file.
+
 ## Versioning Strategy
 
 StoneScriptPHP follows [Semantic Versioning](https://semver.org/):
