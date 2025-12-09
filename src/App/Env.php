@@ -2,34 +2,94 @@
 
 namespace App;
 
+use Framework\Env as FrameworkEnv;
+
 /**
  * Application Environment Configuration
  *
- * This file defines static environment variables loaded from .env file
- * Update these values in your .env file, NOT here!
+ * Extends Framework\Env to add application-specific environment variables.
+ * The framework handles core variables (DEBUG_MODE, TIMEZONE, DATABASE_*, etc.)
+ * Add your application-specific variables here.
  */
-class Env
+class Env extends FrameworkEnv
 {
-    // Database Configuration
-    public static string $DATABASE_HOST = '';
-    public static int    $DATABASE_PORT = 5432;
-    public static string $DATABASE_USER = '';
-    public static string $DATABASE_PASSWORD = '';
-    public static string $DATABASE_DBNAME = '';
-    public static int    $DATABASE_TIMEOUT = 30;
-    public static string $DATABASE_APPNAME = 'StoneScriptPHP';
+    // Application-specific environment variables
+    public $APP_NAME;
+    public $APP_ENV;
+    public $APP_PORT;
 
-    // Email Configuration (ZeptoMail)
-    public static string $ZEPTOMAIL_BOUNCE_ADDRESS = '';
-    public static string $ZEPTOMAIL_SENDER_EMAIL = '';
-    public static string $ZEPTOMAIL_SENDER_NAME = '';
-    public static string $ZEPTOMAIL_SEND_MAIL_TOKEN = '';
+    // Google OAuth (optional)
+    public $GOOGLE_CLIENT_ID;
 
-    // Google OAuth
-    public static string $GOOGLE_CLIENT_ID = '';
+    // JWT Configuration
+    public $JWT_PRIVATE_KEY_PATH;
+    public $JWT_PUBLIC_KEY_PATH;
+    public $JWT_EXPIRY;
 
-    // Application Settings
-    public static int    $DEBUG_MODE = 0;
-    public static string $TIMEZONE = 'UTC';
+    // CORS Configuration
+    public $ALLOWED_ORIGINS;
+
+    /**
+     * Override getSchema to merge application-specific variables with framework variables
+     */
+    public static function getSchema(): array
+    {
+        // Get parent schema (framework variables)
+        $parentSchema = parent::getSchema();
+
+        // Add application-specific variables
+        $appSchema = [
+            'APP_NAME' => [
+                'type' => 'string',
+                'required' => false,
+                'default' => 'My API',
+                'description' => 'Application name'
+            ],
+            'APP_ENV' => [
+                'type' => 'string',
+                'required' => false,
+                'default' => 'development',
+                'description' => 'Application environment (development, staging, production)'
+            ],
+            'APP_PORT' => [
+                'type' => 'int',
+                'required' => false,
+                'default' => 9100,
+                'description' => 'Default port for development server'
+            ],
+            'GOOGLE_CLIENT_ID' => [
+                'type' => 'string',
+                'required' => false,
+                'default' => null,
+                'description' => 'Google OAuth client ID'
+            ],
+            'JWT_PRIVATE_KEY_PATH' => [
+                'type' => 'string',
+                'required' => false,
+                'default' => './keys/jwt-private.pem',
+                'description' => 'Path to JWT private key'
+            ],
+            'JWT_PUBLIC_KEY_PATH' => [
+                'type' => 'string',
+                'required' => false,
+                'default' => './keys/jwt-public.pem',
+                'description' => 'Path to JWT public key'
+            ],
+            'JWT_EXPIRY' => [
+                'type' => 'int',
+                'required' => false,
+                'default' => 3600,
+                'description' => 'JWT token expiry time in seconds'
+            ],
+            'ALLOWED_ORIGINS' => [
+                'type' => 'string',
+                'required' => false,
+                'default' => 'http://localhost:3000,http://localhost:4200',
+                'description' => 'Comma-separated list of allowed CORS origins'
+            ],
+        ];
+
+        // Merge and return
+        return array_merge($parentSchema, $appSchema);
+    }
 }
-
