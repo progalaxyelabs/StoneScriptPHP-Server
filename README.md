@@ -47,8 +47,8 @@ The setup wizard will:
 
 This skeleton provides everything you need:
 
-✅ **Core Framework** - The [stonescriptphp](https://github.com/progalaxyelabs/StoneScriptPHP) framework installed as a dependency
-✅ **CLI Tools** - `php stone` commands for code generation and project management
+✅ **Core Framework** - The [stonescriptphp](https://github.com/progalaxyelabs/StoneScriptPHP) framework with bundled CLI tools
+✅ **CLI Entry Point** - `stone` script that executes CLI tools from framework package
 ✅ **Project Structure** - Organized folders for routes, models, database, and configuration
 ✅ **Example Routes** - Sample `HomeRoute` to demonstrate the pattern
 ✅ **Environment Setup** - Type-safe `.env` configuration with validation
@@ -76,9 +76,13 @@ my-api/
 │       └── Env.php                 # Application environment config
 ├── vendor/
 │   └── progalaxyelabs/
-│       └── stonescriptphp/         # ← Framework lives here
+│       └── stonescriptphp/         # ← Framework + CLI tools live here
+│           ├── cli/                # ← CLI generators (auto-update with composer)
+│           ├── Database.php
+│           ├── Router.php
+│           └── ...
 ├── tests/                          # PHPUnit tests
-├── stone                           # CLI tool
+├── stone                           # CLI entry point (executes tools from vendor/)
 ├── .env                            # Environment variables
 └── composer.json
 ```
@@ -181,6 +185,8 @@ This checks for database drift and ensures your schema matches your code.
 
 ## CLI Commands
 
+**Architecture (v2.0.13+):** The `stone` script in this package is just an entry point. All CLI tools live in `vendor/progalaxyelabs/stonescriptphp/cli/` and auto-update with `composer update`.
+
 ```bash
 # Project Management
 php stone setup                         # Interactive project setup
@@ -188,7 +194,7 @@ php stone serve                         # Start development server (port 9100)
 php stone stop                          # Stop development server
 php stone env                           # Generate .env file
 
-# Code Generation
+# Code Generation (tools in framework package)
 php stone generate route <name>         # Generate route handler
 php stone generate model <file.pgsql>   # Generate model from PostgreSQL function
 php stone generate auth:google          # Generate Google OAuth authentication
@@ -211,7 +217,8 @@ composer migrate                        # Same as: php stone migrate verify
 
 > **📦 Keeping Up to Date:**
 > Run `composer update` to update both the framework and CLI tools.
-> CLI scripts are now bundled with the framework package and auto-update!
+> All CLI generators are bundled with the framework package and auto-update!
+> No manual upgrade needed - just `composer update`!
 
 ## Environment Configuration
 
