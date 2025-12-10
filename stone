@@ -81,6 +81,10 @@ $commands = [
         'description' => 'Start HTTP API server for code generation',
         'file' => 'cli/cli-server.php',
     ],
+    'upgrade' => [
+        'description' => 'Upgrade CLI tools to latest version',
+        'file' => 'cli/upgrade.php',
+    ],
 ];
 
 // Parse command
@@ -122,6 +126,7 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "  php stone generate model get_user.pgsql # Generate model from PostgreSQL function\n";
     echo "  php stone generate auth:google          # Generate Google OAuth\n";
     echo "  php stone migrate verify                # Check database drift\n";
+    echo "  php stone upgrade                       # Upgrade CLI tools to latest version\n";
     echo "\n";
     echo "Run 'php stone <command> --help' for detailed help on any command.\n";
     echo "\n";
