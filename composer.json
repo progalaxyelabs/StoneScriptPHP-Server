@@ -1,6 +1,6 @@
 {
     "name": "progalaxyelabs/stonescriptphp-server",
-    "description": "Application skeleton for StoneScriptPHP - Build production-ready APIs with PostgreSQL",
+    "description": "Application skeleton for StoneScriptPHP. Ready-to-use project template with CLI tools, folder structure, and examples. Includes the stonescriptphp framework as a dependency.",
     "type": "project",
     "license": "MIT",
     "keywords": [

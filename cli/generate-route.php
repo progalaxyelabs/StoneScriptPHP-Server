@@ -81,9 +81,9 @@ if (!str_starts_with($path, '/')) {
  * Always prefixes with HTTP method for consistent naming:
  * GET /api/todos -> GetApiTodos
  * POST /api/todos -> PostApiTodos
- * PUT /api/todos/{id} -> PutApiTodos
- * DELETE /api/todos/{id} -> DeleteApiTodos
- * GET /items/{itemId}/view -> GetItemsView
+ * PUT /api/todos/{id} -> PutApiTodosById
+ * DELETE /api/todos/{id} -> DeleteApiTodosById
+ * GET /items/{itemId}/view -> GetItemsByItemIdView
  */
 function pathToClassName(string $path, string $method): string {
     // Remove leading/trailing slashes
@@ -92,19 +92,28 @@ function pathToClassName(string $path, string $method): string {
     // Split by /
     $parts = explode('/', $path);
 
-    // Remove parameter parts (e.g., {itemId})
-    $parts = array_filter($parts, fn($part) => !preg_match('/^\{.+\}$/', $part));
+    // Track if we have parameters
+    $hasParams = false;
 
-    // Convert each part to PascalCase
-    $parts = array_map(function($part) {
-        // Convert kebab-case or snake_case to PascalCase
-        return implode('', array_map('ucfirst', preg_split('/[-_]/', $part)));
-    }, $parts);
+    // Process parts: convert params to "ByParamName" and regular parts to PascalCase
+    $processedParts = [];
+    foreach ($parts as $part) {
+        if (preg_match('/^\{(.+)\}$/', $part, $matches)) {
+            // This is a parameter like {id} or {itemId}
+            $paramName = $matches[1];
+            $hasParams = true;
+            // Convert to "ByParamName" format (e.g., {id} -> ById, {itemId} -> ByItemId)
+            $processedParts[] = 'By' . implode('', array_map('ucfirst', preg_split('/[-_]/', $paramName)));
+        } else {
+            // Regular path segment - convert to PascalCase
+            $processedParts[] = implode('', array_map('ucfirst', preg_split('/[-_]/', $part)));
+        }
+    }
 
     // Join parts
-    $className = implode('', $parts);
+    $className = implode('', $processedParts);
 
-    // If empty (e.g., path was just "/{id}"), use a default
+    // If empty (e.g., path was just "/"), use a default
     if (empty($className)) {
         $className = 'Index';
     }
@@ -299,46 +308,82 @@ if (!file_exists($routesConfigPath)) {
     exit(1);
 }
 
-// Read current routes
-$routesContent = file_get_contents($routesConfigPath);
+// Load the routes array by including the file
+$routes = require $routesConfigPath;
 
-// Parse the PHP array (simple approach - assumes standard format)
-// We'll add the new route to the appropriate method array
-
-// Build the new route entry
-$routeEntry = "        '$path' => \\App\\Routes\\$routeClassName::class,\n";
-
-// Find the method array and add the route
-$pattern = "/('$method'\s*=>\s*\[)([^\]]*?)(\s*\])/s";
-
-if (preg_match($pattern, $routesContent, $matches)) {
-    // Method array exists, add to it
-    $existingRoutes = $matches[2];
-
-    // Ensure existing routes end with a newline for proper formatting
-    if (!empty($existingRoutes) && !str_ends_with($existingRoutes, "\n")) {
-        $existingRoutes .= "\n";
-    }
-
-    $routesContent = preg_replace(
-        $pattern,
-        "$1$existingRoutes$routeEntry$3",
-        $routesContent
-    );
-} else{
-    // Method array doesn't exist, create it
-    // Find the closing of the return array
-    $routesContent = preg_replace(
-        "/(return\s*\[)/",
-        "$1\n    '$method' => [\n$routeEntry    ],",
-        $routesContent,
-        1
-    );
+// Add the new route to the appropriate method array
+if (!isset($routes[$method])) {
+    $routes[$method] = [];
 }
 
-file_put_contents($routesConfigPath, $routesContent);
+// Check if route already exists
+if (isset($routes[$method][$path])) {
+    echo "Warning: Route $method $path already exists in routes.php\n";
+    echo "Existing route will be replaced.\n";
+}
+
+// Store the class reference (will be formatted as ::class in output)
+$routes[$method][$path] = ['class' => "\\App\\Routes\\$routeClassName", 'is_class_ref' => true];
+
+// Generate the formatted PHP code
+$routesCode = "<?php\n\nreturn [\n";
+
+foreach ($routes as $httpMethod => $methodRoutes) {
+    $routesCode .= "    '$httpMethod' => [\n";
+    foreach ($methodRoutes as $routePath => $routeData) {
+        // Handle both old format (string) and new format (array with metadata)
+        if (is_array($routeData) && isset($routeData['is_class_ref']) && $routeData['is_class_ref']) {
+            // New route we just added - use ::class notation
+            $routesCode .= "        '$routePath' => {$routeData['class']}::class,\n";
+        } else {
+            // Existing route - preserve as-is (already includes ::class or quoted string)
+            $routeClass = is_array($routeData) ? $routeData['class'] : $routeData;
+            $routesCode .= "        '$routePath' => $routeClass,\n";
+        }
+    }
+    $routesCode .= "    ],\n";
+}
+
+$routesCode .= "];\n";
+
+// Write back to file
+file_put_contents($routesConfigPath, $routesCode);
 
 echo "✓ Updated src/config/routes.php with $method $path\n";
+
+// Validate PHP syntax of generated files
+$filesToValidate = [
+    $routeFilePath,
+    $interfaceFilePath,
+    $requestFilePath,
+    $responseFilePath,
+    $routesConfigPath,
+];
+
+$syntaxErrors = [];
+foreach ($filesToValidate as $file) {
+    $output = [];
+    $returnVar = 0;
+    exec("php -l " . escapeshellarg($file) . " 2>&1", $output, $returnVar);
+    if ($returnVar !== 0) {
+        $syntaxErrors[] = [
+            'file' => $file,
+            'error' => implode("\n", $output)
+        ];
+    }
+}
+
+if (!empty($syntaxErrors)) {
+    echo "\n⚠️  WARNING: Syntax errors detected in generated files:\n";
+    foreach ($syntaxErrors as $error) {
+        echo "\n" . basename($error['file']) . ":\n";
+        echo $error['error'] . "\n";
+    }
+    echo "\nPlease fix these syntax errors before running the application.\n";
+} else {
+    echo "✓ All generated files have valid PHP syntax\n";
+}
+
 echo "\nNext steps:\n";
 echo "1. Edit src/App/DTO/$requestClassName.php to define request properties\n";
 echo "2. Edit src/App/DTO/$responseClassName.php to define response properties\n";
