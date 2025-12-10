@@ -18,8 +18,8 @@ echo ""
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FRAMEWORK_DIR="$(dirname "$SCRIPT_DIR")"
-SERVER_DIR="$(dirname "$FRAMEWORK_DIR")/StoneScriptPHP-Server"
+SERVER_DIR="$(dirname "$SCRIPT_DIR")"
+FRAMEWORK_DIR="$(dirname "$SERVER_DIR")/StoneScriptPHP"
 TEST_DIR="/tmp/test-stonescriptphp-cli-crud"
 API_PORT=9156
 
@@ -34,7 +34,7 @@ echo ""
 cleanup() {
     echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
 
-    if [ -f "$TEST_DIR/docker compose.yml" ]; then
+    if [ -f "$TEST_DIR/docker-compose.yml" ]; then
         cd "$TEST_DIR"
         echo "  Stopping docker compose services..."
         docker compose down -v 2>/dev/null || true
@@ -78,7 +78,7 @@ cat > composer.json <<EOF
         }
     ],
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "progalaxyelabs/stonescriptphp": "@dev",
         "phpoffice/phpspreadsheet": "^5.0",
         "google/apiclient": "^2.0"
@@ -105,12 +105,29 @@ else
     exit 1
 fi
 
+# Step 4.5: Generate .env file
+echo -e "\n${YELLOW}⚙️  Generating .env file...${NC}"
+php stone generate env --force > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}  ✓ .env file generated${NC}"
+    # Update with test-specific values
+    sed -i 's/^APP_PORT=.*/APP_PORT='$API_PORT'/' .env
+    sed -i 's/^; DATABASE_DBNAME=.*/DATABASE_DBNAME=books_db/' .env
+    sed -i 's/^; DATABASE_USER=.*/DATABASE_USER=books_user/' .env
+    sed -i 's/^; DATABASE_PASSWORD=.*/DATABASE_PASSWORD=books_pass/' .env
+    sed -i 's/^; DATABASE_HOST=.*/DATABASE_HOST=postgres/' .env
+    echo -e "${GREEN}  ✓ .env configured for test${NC}"
+else
+    echo -e "${RED}  ✗ Failed to generate .env${NC}"
+    exit 1
+fi
+
 # Step 5: Create database schema using CLI-like structure
 echo -e "\n${YELLOW}🗄️  Step 5: Creating database schema files...${NC}"
 
 # Create books table
-mkdir -p src/App/Database/postgres/tables
-cat > src/App/Database/postgres/tables/001_books.pssql <<'SQL'
+mkdir -p src/postgresql/tables
+cat > src/postgresql/tables/001_books.pssql <<'SQL'
 CREATE TABLE IF NOT EXISTS books (
     id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -133,10 +150,10 @@ echo -e "${GREEN}  ✓ Database table schema created${NC}"
 
 # Step 6: Create database functions
 echo -e "\n${YELLOW}⚙️  Step 6: Creating database functions...${NC}"
-mkdir -p src/App/Database/postgres/functions
+mkdir -p postgresql/functions
 
 # Function: List all books
-cat > src/App/Database/postgres/functions/list_books.pssql <<'SQL'
+cat > postgresql/functions/list_books.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION list_books()
 RETURNS JSON AS $$
 BEGIN
@@ -161,7 +178,7 @@ $$ LANGUAGE plpgsql;
 SQL
 
 # Function: Get book by ID
-cat > src/App/Database/postgres/functions/get_book.pssql <<'SQL'
+cat > postgresql/functions/get_book.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION get_book(p_id INT)
 RETURNS JSON AS $$
 DECLARE
@@ -186,7 +203,7 @@ $$ LANGUAGE plpgsql;
 SQL
 
 # Function: Create book
-cat > src/App/Database/postgres/functions/create_book.pssql <<'SQL'
+cat > postgresql/functions/create_book.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION create_book(
     p_title VARCHAR,
     p_author VARCHAR,
@@ -215,7 +232,7 @@ $$ LANGUAGE plpgsql;
 SQL
 
 # Function: Update book
-cat > src/App/Database/postgres/functions/update_book.pssql <<'SQL'
+cat > postgresql/functions/update_book.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION update_book(
     p_id INT,
     p_title VARCHAR DEFAULT NULL,
@@ -253,7 +270,7 @@ $$ LANGUAGE plpgsql;
 SQL
 
 # Function: Delete book
-cat > src/App/Database/postgres/functions/delete_book.pssql <<'SQL'
+cat > postgresql/functions/delete_book.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION delete_book(p_id INT)
 RETURNS JSON AS $$
 DECLARE
@@ -306,19 +323,19 @@ fi
 echo -e "\n${YELLOW}🛣️  Step 8: Generating route handlers with CLI...${NC}"
 
 echo "  Generating routes..."
-php stone generate route list-books 2>&1 | grep -v "Warning" || true
-php stone generate route get-book 2>&1 | grep -v "Warning" || true
-php stone generate route create-book 2>&1 | grep -v "Warning" || true
-php stone generate route update-book 2>&1 | grep -v "Warning" || true
-php stone generate route delete-book 2>&1 | grep -v "Warning" || true
+php stone generate route GET /books 2>&1 | grep -v "Warning" || true
+php stone generate route GET /books/{id}/detail 2>&1 | grep -v "Warning" || true
+php stone generate route POST /books 2>&1 | grep -v "Warning" || true
+php stone generate route PUT /books/{id} 2>&1 | grep -v "Warning" || true
+php stone generate route DELETE /books/{id} 2>&1 | grep -v "Warning" || true
 
 # Verify routes were created
 ROUTES_CREATED=0
-[ -f "src/App/Routes/ListBooksRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
-[ -f "src/App/Routes/GetBookRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
-[ -f "src/App/Routes/CreateBookRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
-[ -f "src/App/Routes/UpdateBookRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
-[ -f "src/App/Routes/DeleteBookRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
+[ -f "src/App/Routes/GetBooksRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
+[ -f "src/App/Routes/GetBooksDetailRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
+[ -f "src/App/Routes/PostBooksRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
+[ -f "src/App/Routes/PutBooksRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
+[ -f "src/App/Routes/DeleteBooksRoute.php" ] && ROUTES_CREATED=$((ROUTES_CREATED + 1))
 
 if [ $ROUTES_CREATED -eq 5 ]; then
     echo -e "${GREEN}  ✓ Generated 5 route handler classes${NC}"
@@ -336,25 +353,25 @@ if [ ! -f "src/App/Config/routes.php" ]; then
     cat > src/App/Config/routes.php <<'PHP'
 <?php
 
-use App\Routes\ListBooksRoute;
-use App\Routes\GetBookRoute;
-use App\Routes\CreateBookRoute;
-use App\Routes\UpdateBookRoute;
-use App\Routes\DeleteBookRoute;
+use App\Routes\GetBooksRoute;
+use App\Routes\GetBooksDetailRoute;
+use App\Routes\PostBooksRoute;
+use App\Routes\PutBooksRoute;
+use App\Routes\DeleteBooksRoute;
 
 return [
     'GET' => [
-        '/books' => ListBooksRoute::class,
-        '/books/:id' => GetBookRoute::class,
+        '/books' => GetBooksRoute::class,
+        '/books/:id/detail' => GetBooksDetailRoute::class,
     ],
     'POST' => [
-        '/books' => CreateBookRoute::class,
+        '/books' => PostBooksRoute::class,
     ],
     'PUT' => [
-        '/books/:id' => UpdateBookRoute::class,
+        '/books/:id' => PutBooksRoute::class,
     ],
     'DELETE' => [
-        '/books/:id' => DeleteBookRoute::class,
+        '/books/:id' => DeleteBooksRoute::class,
     ],
 ];
 PHP
@@ -367,42 +384,86 @@ fi
 echo -e "\n${YELLOW}💻 Step 10: Implementing route handlers...${NC}"
 
 # Since CLI generates basic stubs, we need to implement the actual logic
-# For this test, we'll create a simple implementation
+# Overwrite the generated route handlers with working implementations
 
-cat > src/App/Routes/ListBooksRoute.php <<'PHP'
+cat > src/App/Routes/GetBooksRoute.php <<'PHP'
 <?php
 
 namespace App\Routes;
 
-use Framework\IRouteHandler;
+use App\Contracts\IGetBooksRoute;
+use App\DTO\GetBooksRequest;
+use App\DTO\GetBooksResponse;
 use Framework\ApiResponse;
-use Database\Functions\FnListBooks;
 
-class ListBooksRoute implements IRouteHandler
+class GetBooksRoute implements IGetBooksRoute
 {
     public function validation_rules(): array
     {
         return [];
     }
 
-    public function process(): ApiResponse
+    public function process(GetBooksRequest $request): ApiResponse
     {
-        $books = FnListBooks::run();
-        return res_ok(['books' => json_decode($books, true)]);
+        // Call PostgreSQL function directly
+        $db = db();
+        $stmt = $db->query('SELECT list_books() as result');
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $books = json_decode($result['result'], true) ?: [];
+
+        return res_ok($books);
     }
 }
 PHP
 
-cat > src/App/Routes/CreateBookRoute.php <<'PHP'
+cat > src/App/Routes/GetBooksDetailRoute.php <<'PHP'
 <?php
 
 namespace App\Routes;
 
-use Framework\IRouteHandler;
+use App\Contracts\IGetBooksDetailRoute;
+use App\DTO\GetBooksDetailRequest;
+use App\DTO\GetBooksDetailResponse;
 use Framework\ApiResponse;
-use Database\Functions\FnCreateBook;
 
-class CreateBookRoute implements IRouteHandler
+class GetBooksDetailRoute implements IGetBooksDetailRoute
+{
+    public function validation_rules(): array
+    {
+        return [];
+    }
+
+    public function process(GetBooksDetailRequest $request): ApiResponse
+    {
+        $id = $request->id;
+
+        // Call PostgreSQL function directly
+        $db = db();
+        $stmt = $db->prepare('SELECT get_book($1) as result');
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$result || !$result['result']) {
+            return res_not_found(['error' => 'Book not found']);
+        }
+
+        $book = json_decode($result['result'], true);
+        return res_ok($book);
+    }
+}
+PHP
+
+cat > src/App/Routes/PostBooksRoute.php <<'PHP'
+<?php
+
+namespace App\Routes;
+
+use App\Contracts\IPostBooksRoute;
+use App\DTO\PostBooksRequest;
+use App\DTO\PostBooksResponse;
+use Framework\ApiResponse;
+
+class PostBooksRoute implements IPostBooksRoute
 {
     public function validation_rules(): array
     {
@@ -414,18 +475,108 @@ class CreateBookRoute implements IRouteHandler
         ];
     }
 
-    public function process(): ApiResponse
+    public function process(PostBooksRequest $request): ApiResponse
     {
         $input = request_body();
 
-        $book = FnCreateBook::run(
+        // Call PostgreSQL function directly
+        $db = db();
+        $stmt = $db->prepare('SELECT create_book($1, $2, $3, $4) as result');
+        $stmt->execute([
             $input['title'],
             $input['author'],
             $input['isbn'] ?? null,
             $input['published_year'] ?? null
-        );
+        ]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $book = json_decode($result['result'], true);
 
-        return res_ok(['book' => json_decode($book, true)], 201);
+        return res_ok($book, 201);
+    }
+}
+PHP
+
+cat > src/App/Routes/PutBooksRoute.php <<'PHP'
+<?php
+
+namespace App\Routes;
+
+use App\Contracts\IPutBooksRoute;
+use App\DTO\PutBooksRequest;
+use App\DTO\PutBooksResponse;
+use Framework\ApiResponse;
+
+class PutBooksRoute implements IPutBooksRoute
+{
+    public function validation_rules(): array
+    {
+        return [
+            'title' => 'string',
+            'author' => 'string',
+            'isbn' => 'string',
+            'published_year' => 'integer',
+        ];
+    }
+
+    public function process(PutBooksRequest $request): ApiResponse
+    {
+        $id = $request->id;
+        $input = request_body();
+
+        // Call PostgreSQL function directly
+        $db = db();
+        $stmt = $db->prepare('SELECT update_book($1, $2, $3, $4, $5) as result');
+        $stmt->execute([
+            $id,
+            $input['title'] ?? null,
+            $input['author'] ?? null,
+            $input['isbn'] ?? null,
+            $input['published_year'] ?? null
+        ]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$result || !$result['result']) {
+            return res_not_found(['error' => 'Book not found']);
+        }
+
+        $book = json_decode($result['result'], true);
+        return res_ok($book);
+    }
+}
+PHP
+
+cat > src/App/Routes/DeleteBooksRoute.php <<'PHP'
+<?php
+
+namespace App\Routes;
+
+use App\Contracts\IDeleteBooksRoute;
+use App\DTO\DeleteBooksRequest;
+use App\DTO\DeleteBooksResponse;
+use Framework\ApiResponse;
+
+class DeleteBooksRoute implements IDeleteBooksRoute
+{
+    public function validation_rules(): array
+    {
+        return [];
+    }
+
+    public function process(DeleteBooksRequest $request): ApiResponse
+    {
+        $id = $request->id;
+
+        // Call PostgreSQL function directly
+        $db = db();
+        $stmt = $db->prepare('SELECT delete_book($1) as result');
+        $stmt->execute([$id]);
+        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$result || !$result['result']) {
+            return res_not_found(['error' => 'Book not found']);
+        }
+
+        return res_ok(['message' => 'Book deleted successfully']);
     }
 }
 PHP
@@ -438,7 +589,7 @@ cd "$TEST_DIR"
 
 # Create Dockerfile
 cat > api/Dockerfile <<'EOF'
-FROM php:8.2-apache
+FROM php:8.3-apache
 
 RUN apt-get update && apt-get install -y \
     libpq-dev \
@@ -459,10 +610,8 @@ EXPOSE 80
 CMD ["apache2-foreground"]
 EOF
 
-# Create docker compose.yml
-cat > docker compose.yml <<EOF
-version: '3.8'
-
+# Create docker-compose.yml
+cat > docker-compose.yml <<EOF
 services:
   postgres:
     image: postgres:16-alpine
@@ -529,8 +678,8 @@ fi
 
 # Step 13: Initialize database
 echo -e "\n${YELLOW}💾 Step 13: Initializing database...${NC}"
-docker compose exec -T postgres psql -U books_user -d books_db < api/src/App/Database/postgres/tables/001_books.pssql
-for func in api/src/App/Database/postgres/functions/*.pssql; do
+docker compose exec -T postgres psql -U books_user -d books_db < api/src/postgresql/tables/001_books.pssql
+for func in api/postgresql/functions/*.pssql; do
     docker compose exec -T postgres psql -U books_user -d books_db < "$func"
 done
 echo -e "${GREEN}  ✓ Database initialized with seed data${NC}"

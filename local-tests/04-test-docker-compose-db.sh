@@ -17,8 +17,8 @@ echo ""
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FRAMEWORK_DIR="$(dirname "$SCRIPT_DIR")"
-SERVER_DIR="$(dirname "$FRAMEWORK_DIR")/StoneScriptPHP-Server"
+SERVER_DIR="$(dirname "$SCRIPT_DIR")"
+FRAMEWORK_DIR="$(dirname "$SERVER_DIR")/StoneScriptPHP"
 TEST_DIR="/tmp/test-stonescriptphp-db"
 DEV_PORT=9153
 PROD_PORT=9154
@@ -36,7 +36,7 @@ cleanup() {
     echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
 
     # Stop docker compose
-    if [ -f "$TEST_DIR/docker compose.yml" ]; then
+    if [ -f "$TEST_DIR/docker-compose.yml" ]; then
         cd "$TEST_DIR"
         echo "  Stopping docker compose services..."
         docker compose down -v 2>/dev/null || true
@@ -82,7 +82,7 @@ cat > composer.json <<EOF
         }
     ],
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "progalaxyelabs/stonescriptphp": "@dev",
         "phpoffice/phpspreadsheet": "^5.0",
         "google/apiclient": "^2.0"
@@ -198,26 +198,11 @@ PHP
 
 echo -e "${GREEN}  ✓ Test endpoint created${NC}"
 
-# Step 6: Create Dockerfiles
-echo -e "\n${YELLOW}🐳 Step 6: Creating Dockerfiles...${NC}"
+# Step 6: Create config files and Dockerfiles
+echo -e "\n${YELLOW}🐳 Step 6: Creating config files and Dockerfiles...${NC}"
 
-# Dev Dockerfile
-cat > Dockerfile.dev <<'EOF'
-FROM php:8.2-fpm-alpine
-
-RUN apk add --no-cache \
-    postgresql-dev \
-    nginx \
-    supervisor \
-    curl
-
-RUN docker-php-ext-install pdo pdo_pgsql
-
-WORKDIR /var/www/html
-COPY . /var/www/html/
-
-RUN mkdir -p /etc/nginx/http.d
-RUN cat > /etc/nginx/http.d/default.conf <<'NGINX'
+# Create nginx config for dev
+cat > nginx.conf <<'EOF'
 server {
     listen 80;
     server_name localhost;
@@ -227,9 +212,10 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 }
-NGINX
+EOF
 
-RUN cat > /etc/supervisor/conf.d/supervisord.conf <<'SUPERVISOR'
+# Create supervisor config for dev
+cat > supervisord.conf <<'EOF'
 [supervisord]
 nodaemon=true
 user=root
@@ -243,8 +229,8 @@ stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 
-[program:php-stone]
-command=php /var/www/html/stone serve
+[program:php-server]
+command=php -S 127.0.0.1:9100 -t /var/www/html
 directory=/var/www/html
 autostart=true
 autorestart=true
@@ -252,7 +238,41 @@ stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
-SUPERVISOR
+EOF
+
+# Create Apache vhost config for prod
+cat > 000-default.conf <<'EOF'
+<VirtualHost *:80>
+    DocumentRoot /var/www/html/public
+    <Directory /var/www/html/public>
+        AllowOverride All
+        Require all granted
+        RewriteEngine On
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteCond %{REQUEST_FILENAME} !-d
+        RewriteRule ^(.*)$ index.php [QSA,L]
+    </Directory>
+</VirtualHost>
+EOF
+
+# Dev Dockerfile
+cat > Dockerfile.dev <<'EOF'
+FROM php:8.3-fpm-alpine
+
+RUN apk add --no-cache \
+    postgresql-dev \
+    nginx \
+    supervisor \
+    curl
+
+RUN docker-php-ext-install pdo pdo_pgsql
+
+WORKDIR /var/www/html
+COPY . /var/www/html/
+
+RUN mkdir -p /etc/nginx/http.d /etc/supervisor/conf.d
+COPY nginx.conf /etc/nginx/http.d/default.conf
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 EXPOSE 80
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
@@ -260,7 +280,7 @@ EOF
 
 # Prod Dockerfile
 cat > Dockerfile.prod <<'EOF'
-FROM php:8.2-apache
+FROM php:8.3-apache
 
 RUN apt-get update && apt-get install -y \
     libpq-dev \
@@ -276,19 +296,7 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 WORKDIR /var/www/html
 COPY . /var/www/html/
 
-RUN cat > /etc/apache2/sites-available/000-default.conf <<'VHOST'
-<VirtualHost *:80>
-    DocumentRoot /var/www/html/public
-    <Directory /var/www/html/public>
-        AllowOverride All
-        Require all granted
-        RewriteEngine On
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^(.*)$ index.php [QSA,L]
-    </Directory>
-</VirtualHost>
-VHOST
+COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
 
 RUN chown -R www-data:www-data /var/www/html
 
@@ -296,15 +304,13 @@ EXPOSE 80
 CMD ["apache2-foreground"]
 EOF
 
-echo -e "${GREEN}  ✓ Dockerfiles created${NC}"
+echo -e "${GREEN}  ✓ Config files and Dockerfiles created${NC}"
 
-# Step 7: Create docker compose.yml
-echo -e "\n${YELLOW}🐳 Step 7: Creating docker compose.yml...${NC}"
+# Step 7: Create docker-compose.yml
+echo -e "\n${YELLOW}🐳 Step 7: Creating docker-compose.yml...${NC}"
 cd "$TEST_DIR"
 
-cat > docker compose.yml <<EOF
-version: '3.8'
-
+cat > docker-compose.yml <<EOF
 services:
   postgres:
     image: postgres:16-alpine
@@ -375,7 +381,7 @@ networks:
     driver: bridge
 EOF
 
-echo -e "${GREEN}  ✓ docker compose.yml created${NC}"
+echo -e "${GREEN}  ✓ docker-compose.yml created${NC}"
 
 # Step 8: Start docker compose
 echo -e "\n${YELLOW}🚀 Step 8: Starting docker compose services...${NC}"

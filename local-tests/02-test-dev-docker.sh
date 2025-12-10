@@ -17,8 +17,8 @@ echo ""
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FRAMEWORK_DIR="$(dirname "$SCRIPT_DIR")"
-SERVER_DIR="$(dirname "$FRAMEWORK_DIR")/StoneScriptPHP-Server"
+SERVER_DIR="$(dirname "$SCRIPT_DIR")"
+FRAMEWORK_DIR="$(dirname "$SERVER_DIR")/StoneScriptPHP"
 TEST_DIR="/tmp/test-stonescriptphp-dev-docker"
 TEST_PORT=9151
 INTERNAL_PORT=9100
@@ -37,8 +37,12 @@ echo ""
 cleanup() {
     echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
 
-    # Stop and remove container
-    if [ ! -z "$CONTAINER_ID" ]; then
+    # Stop and remove container by name or ID
+    if [ ! -z "$CONTAINER_NAME" ]; then
+        echo "  Stopping container: $CONTAINER_NAME"
+        docker stop $CONTAINER_NAME 2>/dev/null || true
+        docker rm $CONTAINER_NAME 2>/dev/null || true
+    elif [ ! -z "$CONTAINER_ID" ]; then
         echo "  Stopping container: $CONTAINER_ID"
         docker stop $CONTAINER_ID 2>/dev/null || true
         docker rm $CONTAINER_ID 2>/dev/null || true
@@ -94,7 +98,7 @@ cat > composer.json <<EOF
         }
     ],
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "progalaxyelabs/stonescriptphp": "@dev",
         "phpoffice/phpspreadsheet": "^5.0",
         "google/apiclient": "^2.0"
@@ -121,11 +125,54 @@ else
     exit 1
 fi
 
-# Step 5: Create Dockerfile in server folder
-echo -e "\n${YELLOW}🐳 Step 5: Creating Dockerfile...${NC}"
+# Step 5: Create config files and Dockerfile
+echo -e "\n${YELLOW}🐳 Step 5: Creating config files and Dockerfile...${NC}"
 
+# Create nginx config file
+cat > nginx.conf <<'EOF'
+server {
+    listen 80;
+    server_name localhost;
+
+    location / {
+        proxy_pass http://127.0.0.1:9100;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+
+# Create supervisor config file
+cat > supervisord.conf <<'EOF'
+[supervisord]
+nodaemon=true
+user=root
+
+[program:nginx]
+command=/usr/sbin/nginx -g "daemon off;"
+autostart=true
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+
+[program:php-server]
+command=php -S 127.0.0.1:9100 -t /var/www/html
+directory=/var/www/html
+autostart=true
+autorestart=true
+stdout_logfile=/dev/stdout
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/stderr
+stderr_logfile_maxbytes=0
+EOF
+
+# Create Dockerfile
 cat > Dockerfile <<'EOF'
-FROM php:8.2-fpm-alpine
+FROM php:8.3-fpm-alpine
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -141,69 +188,31 @@ RUN docker-php-ext-install pdo pdo_pgsql
 WORKDIR /var/www/html
 COPY . /var/www/html/
 
-# Create nginx config
-RUN mkdir -p /etc/nginx/http.d
-RUN cat > /etc/nginx/http.d/default.conf <<'NGINX'
-server {
-    listen 80;
-    server_name localhost;
-
-    location / {
-        proxy_pass http://127.0.0.1:9100;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-NGINX
-
-# Create supervisor config to run both nginx and php stone serve
-RUN cat > /etc/supervisor/conf.d/supervisord.conf <<'SUPERVISOR'
-[supervisord]
-nodaemon=true
-user=root
-
-[program:nginx]
-command=/usr/sbin/nginx -g "daemon off;"
-autostart=true
-autorestart=true
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-
-[program:php-stone]
-command=php /var/www/html/stone serve
-directory=/var/www/html
-autostart=true
-autorestart=true
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-SUPERVISOR
+# Copy config files
+RUN mkdir -p /etc/nginx/http.d /etc/supervisor/conf.d
+COPY nginx.conf /etc/nginx/http.d/default.conf
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Generate .env file using CLI and update values
 RUN php stone generate env --force && \
     sed -i 's/^APP_ENV=.*/APP_ENV=development/' .env && \
     sed -i 's/^APP_PORT=.*/APP_PORT=9100/' .env && \
     sed -i 's/^DATABASE_HOST=.*/DATABASE_HOST=localhost/' .env && \
-    sed -i 's/^DATABASE_DBNAME=.*/DATABASE_DBNAME=test_db/' .env && \
-    sed -i 's/^DATABASE_USER=.*/DATABASE_USER=test_user/' .env && \
-    sed -i 's/^DATABASE_PASSWORD=.*/DATABASE_PASSWORD=test_pass/' .env
+    sed -i 's/^; DATABASE_DBNAME=.*/DATABASE_DBNAME=test_db/' .env && \
+    sed -i 's/^; DATABASE_USER=.*/DATABASE_USER=test_user/' .env && \
+    sed -i 's/^; DATABASE_PASSWORD=.*/DATABASE_PASSWORD=test_pass/' .env
 
 EXPOSE 80
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 EOF
 
-echo -e "${GREEN}  ✓ Dockerfile created${NC}"
+echo -e "${GREEN}  ✓ Config files and Dockerfile created${NC}"
 
 # Step 6: Build the Docker image
 echo -e "\n${YELLOW}🔨 Step 6: Building Docker image...${NC}"
-docker build -t $IMAGE_NAME . --quiet
-if [ $? -eq 0 ]; then
+docker build -t $IMAGE_NAME . 2>&1 | grep -E "(Step|Successfully|Error|^#)" | head -20 || true
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
     echo -e "${GREEN}  ✓ Docker image built successfully${NC}"
 else
     echo -e "${RED}  ✗ Docker build failed${NC}"
@@ -212,18 +221,20 @@ fi
 
 # Step 7: Start container
 echo -e "\n${YELLOW}🚀 Step 7: Starting Docker container...${NC}"
-CONTAINER_ID=$(docker run -d -p $TEST_PORT:80 $IMAGE_NAME)
+CONTAINER_NAME="test-stonescript-dev-$$"
+CONTAINER_ID=$(docker run -d --name $CONTAINER_NAME -p $TEST_PORT:80 $IMAGE_NAME)
 echo "  Container ID: $CONTAINER_ID"
+echo "  Container Name: $CONTAINER_NAME"
 
 # Wait for container to start
 echo "  Waiting for services to start..."
 sleep 5
 
 # Check if container is running
-if ! docker ps | grep -q $CONTAINER_ID; then
+if ! docker ps | grep -q $CONTAINER_NAME; then
     echo -e "${RED}  ✗ Container failed to start${NC}"
     echo "  Container logs:"
-    docker logs $CONTAINER_ID
+    docker logs $CONTAINER_NAME
     exit 1
 fi
 echo -e "${GREEN}  ✓ Container started successfully${NC}"

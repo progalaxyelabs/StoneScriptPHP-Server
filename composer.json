@@ -61,6 +61,29 @@
         "optimize-autoloader": true,
         "preferred-install": "dist"
     },
+    "archive": {
+        "exclude": [
+            "/local-tests",
+            "/.github",
+            "/tests",
+            "/docs",
+            "/.git",
+            "/.env",
+            "/.env.*",
+            "*.pem",
+            "*.pub",
+            "*.key",
+            "*.log",
+            "/logs",
+            "/uploads",
+            "/.idea",
+            "/.vscode",
+            "/.claude",
+            "/.phpunit.cache",
+            "/vendor",
+            "/node_modules"
+        ]
+    },
     "minimum-stability": "stable",
     "prefer-stable": true
 }

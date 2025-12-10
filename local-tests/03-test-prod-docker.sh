@@ -17,8 +17,8 @@ echo ""
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FRAMEWORK_DIR="$(dirname "$SCRIPT_DIR")"
-SERVER_DIR="$(dirname "$FRAMEWORK_DIR")/StoneScriptPHP-Server"
+SERVER_DIR="$(dirname "$SCRIPT_DIR")"
+FRAMEWORK_DIR="$(dirname "$SERVER_DIR")/StoneScriptPHP"
 TEST_DIR="/tmp/test-stonescriptphp-prod-docker"
 TEST_PORT=9152
 IMAGE_NAME="stonescriptphp-prod-test"
@@ -35,8 +35,12 @@ echo ""
 cleanup() {
     echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
 
-    # Stop and remove container
-    if [ ! -z "$CONTAINER_ID" ]; then
+    # Stop and remove container by name or ID
+    if [ ! -z "$CONTAINER_NAME" ]; then
+        echo "  Stopping container: $CONTAINER_NAME"
+        docker stop $CONTAINER_NAME 2>/dev/null || true
+        docker rm $CONTAINER_NAME 2>/dev/null || true
+    elif [ ! -z "$CONTAINER_ID" ]; then
         echo "  Stopping container: $CONTAINER_ID"
         docker stop $CONTAINER_ID 2>/dev/null || true
         docker rm $CONTAINER_ID 2>/dev/null || true
@@ -92,7 +96,7 @@ cat > composer.json <<EOF
         }
     ],
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "progalaxyelabs/stonescriptphp": "@dev",
         "phpoffice/phpspreadsheet": "^5.0",
         "google/apiclient": "^2.0"
@@ -111,16 +115,16 @@ echo -e "${GREEN}  ✓ composer.json updated${NC}"
 
 # Step 4: Run composer install
 echo -e "\n${YELLOW}📥 Step 4: Running composer install...${NC}"
-composer install --no-interaction --no-dev --optimize-autoloader --quiet
-if [ $? -eq 0 ]; then
+composer install --no-interaction --no-dev --optimize-autoloader 2>&1 | grep -E "(Installing|Generating|✓|✗|Error)" || true
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
     echo -e "${GREEN}  ✓ Composer dependencies installed${NC}"
 else
     echo -e "${RED}  ✗ Composer install failed${NC}"
     exit 1
 fi
 
-# Step 5: Create Dockerfile with Apache
-echo -e "\n${YELLOW}🐳 Step 5: Creating production Dockerfile...${NC}"
+# Step 5: Create config files and Dockerfile
+echo -e "\n${YELLOW}🐳 Step 5: Creating config files and production Dockerfile...${NC}"
 
 # Create public/index.php that routes through the framework
 mkdir -p public
@@ -147,8 +151,42 @@ echo json_encode([
 ]);
 PHP
 
+# Create Apache vhost config file
+cat > 000-default.conf <<'EOF'
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/html/public
+
+    <Directory /var/www/html/public>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+
+        # Route all requests through index.php
+        RewriteEngine On
+        RewriteCond %{REQUEST_FILENAME} !-f
+        RewriteCond %{REQUEST_FILENAME} !-d
+        RewriteRule ^(.*)$ index.php [QSA,L]
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+EOF
+
+# Create .htaccess file
+cat > .htaccess <<'EOF'
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+EOF
+
+# Create Dockerfile
 cat > Dockerfile <<'EOF'
-FROM php:8.2-apache
+FROM php:8.3-apache
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -173,46 +211,17 @@ RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf
 WORKDIR /var/www/html
 COPY . /var/www/html/
 
-# Create Apache vhost config
-RUN cat > /etc/apache2/sites-available/000-default.conf <<'VHOST'
-<VirtualHost *:80>
-    ServerAdmin webmaster@localhost
-    DocumentRoot /var/www/html/public
-
-    <Directory /var/www/html/public>
-        Options Indexes FollowSymLinks
-        AllowOverride All
-        Require all granted
-
-        # Route all requests through index.php
-        RewriteEngine On
-        RewriteCond %{REQUEST_FILENAME} !-f
-        RewriteCond %{REQUEST_FILENAME} !-d
-        RewriteRule ^(.*)$ index.php [QSA,L]
-    </Directory>
-
-    ErrorLog ${APACHE_LOG_DIR}/error.log
-    CustomLog ${APACHE_LOG_DIR}/access.log combined
-</VirtualHost>
-VHOST
-
-# Create .htaccess for URL rewriting
-RUN cat > /var/www/html/public/.htaccess <<'HTACCESS'
-<IfModule mod_rewrite.c>
-    RewriteEngine On
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^(.*)$ index.php [QSA,L]
-</IfModule>
-HTACCESS
+# Copy Apache config and .htaccess
+COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
+COPY .htaccess /var/www/html/public/.htaccess
 
 # Generate .env file using CLI and update values
 RUN php stone generate env --force && \
     sed -i 's/^APP_ENV=.*/APP_ENV=production/' .env && \
     sed -i 's/^DATABASE_HOST=.*/DATABASE_HOST=localhost/' .env && \
-    sed -i 's/^DATABASE_DBNAME=.*/DATABASE_DBNAME=prod_db/' .env && \
-    sed -i 's/^DATABASE_USER=.*/DATABASE_USER=prod_user/' .env && \
-    sed -i 's/^DATABASE_PASSWORD=.*/DATABASE_PASSWORD=prod_pass/' .env
+    sed -i 's/^; DATABASE_DBNAME=.*/DATABASE_DBNAME=prod_db/' .env && \
+    sed -i 's/^; DATABASE_USER=.*/DATABASE_USER=prod_user/' .env && \
+    sed -i 's/^; DATABASE_PASSWORD=.*/DATABASE_PASSWORD=prod_pass/' .env
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html
@@ -223,12 +232,12 @@ EXPOSE 80
 CMD ["apache2-foreground"]
 EOF
 
-echo -e "${GREEN}  ✓ Dockerfile created${NC}"
+echo -e "${GREEN}  ✓ Config files and Dockerfile created${NC}"
 
 # Step 6: Build the Docker image
 echo -e "\n${YELLOW}🔨 Step 6: Building Docker image...${NC}"
-docker build -t $IMAGE_NAME . --quiet
-if [ $? -eq 0 ]; then
+docker build -t $IMAGE_NAME . 2>&1 | grep -E "(Step|Successfully|Error|^#)" | head -20 || true
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
     echo -e "${GREEN}  ✓ Docker image built successfully${NC}"
 else
     echo -e "${RED}  ✗ Docker build failed${NC}"
@@ -237,18 +246,20 @@ fi
 
 # Step 7: Start container
 echo -e "\n${YELLOW}🚀 Step 7: Starting Docker container...${NC}"
-CONTAINER_ID=$(docker run -d -p $TEST_PORT:80 $IMAGE_NAME)
+CONTAINER_NAME="test-stonescript-prod-$$"
+CONTAINER_ID=$(docker run -d --name $CONTAINER_NAME -p $TEST_PORT:80 $IMAGE_NAME)
 echo "  Container ID: $CONTAINER_ID"
+echo "  Container Name: $CONTAINER_NAME"
 
 # Wait for container to start
 echo "  Waiting for Apache to start..."
 sleep 5
 
 # Check if container is running
-if ! docker ps | grep -q $CONTAINER_ID; then
+if ! docker ps | grep -q $CONTAINER_NAME; then
     echo -e "${RED}  ✗ Container failed to start${NC}"
     echo "  Container logs:"
-    docker logs $CONTAINER_ID
+    docker logs $CONTAINER_NAME
     exit 1
 fi
 echo -e "${GREEN}  ✓ Container started successfully${NC}"

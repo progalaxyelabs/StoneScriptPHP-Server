@@ -18,6 +18,7 @@ composer.lock
 # IDE & Editors
 /.idea/
 /.vscode/
+/.claude/
 /.phpunit.cache/
 /.phpunit.result.cache
 /phpunit.xml

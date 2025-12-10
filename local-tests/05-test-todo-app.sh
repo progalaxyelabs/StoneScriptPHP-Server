@@ -18,8 +18,8 @@ echo ""
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FRAMEWORK_DIR="$(dirname "$SCRIPT_DIR")"
-SERVER_DIR="$(dirname "$FRAMEWORK_DIR")/StoneScriptPHP-Server"
+SERVER_DIR="$(dirname "$SCRIPT_DIR")"
+FRAMEWORK_DIR="$(dirname "$SERVER_DIR")/StoneScriptPHP"
 TEST_DIR="/tmp/test-stonescriptphp-todo"
 API_PORT=9155
 
@@ -34,7 +34,7 @@ echo ""
 cleanup() {
     echo -e "\n${YELLOW}🧹 Cleaning up...${NC}"
 
-    if [ -f "$TEST_DIR/docker compose.yml" ]; then
+    if [ -f "$TEST_DIR/docker-compose.yml" ]; then
         cd "$TEST_DIR"
         echo "  Stopping docker compose services..."
         docker compose down -v 2>/dev/null || true
@@ -79,7 +79,7 @@ cat > composer.json <<EOF
         }
     ],
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "progalaxyelabs/stonescriptphp": "@dev",
         "phpoffice/phpspreadsheet": "^5.0",
         "google/apiclient": "^2.0"
@@ -393,7 +393,7 @@ echo -e "${GREEN}  ✓ REST API created${NC}"
 echo -e "\n${YELLOW}🐳 Step 7: Creating Dockerfile...${NC}"
 
 cat > Dockerfile <<'EOF'
-FROM php:8.2-apache
+FROM php:8.3-apache
 
 RUN apt-get update && apt-get install -y \
     libpq-dev \
@@ -409,7 +409,15 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 WORKDIR /var/www/html
 COPY . /var/www/html/
 
-RUN cat > /etc/apache2/sites-available/000-default.conf <<'VHOST'
+COPY 000-default.conf /etc/apache2/sites-available/000-default.conf
+
+RUN chown -R www-data:www-data /var/www/html
+EXPOSE 80
+CMD ["apache2-foreground"]
+EOF
+
+# Create Apache vhost config file
+cat > 000-default.conf <<'EOF'
 <VirtualHost *:80>
     DocumentRoot /var/www/html/public
     <Directory /var/www/html/public>
@@ -421,22 +429,15 @@ RUN cat > /etc/apache2/sites-available/000-default.conf <<'VHOST'
         RewriteRule ^(.*)$ index.php [QSA,L]
     </Directory>
 </VirtualHost>
-VHOST
-
-RUN chown -R www-data:www-data /var/www/html
-EXPOSE 80
-CMD ["apache2-foreground"]
 EOF
 
 echo -e "${GREEN}  ✓ Dockerfile created${NC}"
 
-# Step 8: Create docker compose.yml
-echo -e "\n${YELLOW}🐳 Step 8: Creating docker compose.yml...${NC}"
+# Step 8: Create docker-compose.yml
+echo -e "\n${YELLOW}🐳 Step 8: Creating docker-compose.yml...${NC}"
 cd "$TEST_DIR"
 
-cat > docker compose.yml <<EOF
-version: '3.8'
-
+cat > docker-compose.yml <<EOF
 services:
   postgres:
     image: postgres:16-alpine
@@ -485,7 +486,7 @@ networks:
     driver: bridge
 EOF
 
-echo -e "${GREEN}  ✓ docker compose.yml created${NC}"
+echo -e "${GREEN}  ✓ docker-compose.yml created${NC}"
 
 # Step 9: Start services
 echo -e "\n${YELLOW}🚀 Step 9: Starting services...${NC}"
@@ -542,7 +543,7 @@ RESPONSE=$(curl -s -X POST $API_URL/todos \
     -H "Content-Type: application/json" \
     -d '{"title":"Buy groceries","description":"Milk, eggs, bread"}')
 echo "  Response: $RESPONSE"
-TODO_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
+TODO_ID=$(echo "$RESPONSE" | grep -o '"id":[[:space:]]*[0-9]*' | grep -o '[0-9]\+')
 if [ ! -z "$TODO_ID" ]; then
     echo -e "${GREEN}  ✓ Todo created with ID: $TODO_ID${NC}"
 else
@@ -556,7 +557,7 @@ RESPONSE=$(curl -s -X POST $API_URL/todos \
     -H "Content-Type: application/json" \
     -d '{"title":"Write tests","description":"Complete integration tests"}')
 echo "  Response: $RESPONSE"
-TODO_ID2=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | grep -o '[0-9]*')
+TODO_ID2=$(echo "$RESPONSE" | grep -o '"id":[[:space:]]*[0-9]*' | grep -o '[0-9]\+')
 if [ ! -z "$TODO_ID2" ]; then
     echo -e "${GREEN}  ✓ Second todo created with ID: $TODO_ID2${NC}"
 else
@@ -593,7 +594,7 @@ RESPONSE=$(curl -s -X PUT $API_URL/todos/$TODO_ID \
     -H "Content-Type: application/json" \
     -d '{"completed":true}')
 echo "  Response: $RESPONSE"
-if echo "$RESPONSE" | grep -q '"completed":true'; then
+if echo "$RESPONSE" | grep -q '"completed":[[:space:]]*true'; then
     echo -e "${GREEN}  ✓ Todo marked as completed${NC}"
 else
     echo -e "${RED}  ✗ Failed to update todo${NC}"
@@ -604,7 +605,7 @@ fi
 echo -e "\n${BLUE}Test 8: Delete Todo${NC}"
 RESPONSE=$(curl -s -X DELETE $API_URL/todos/$TODO_ID2)
 echo "  Response: $RESPONSE"
-if echo "$RESPONSE" | grep -q '"deleted":true'; then
+if echo "$RESPONSE" | grep -q '"deleted":[[:space:]]*true'; then
     echo -e "${GREEN}  ✓ Todo deleted${NC}"
 else
     echo -e "${RED}  ✗ Failed to delete todo${NC}"
