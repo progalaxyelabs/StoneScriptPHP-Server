@@ -203,10 +203,6 @@ php stone migrate run                   # Apply migrations (not yet implemented)
 # Testing
 php stone test                          # Run PHPUnit test suite
 
-# Maintenance
-php stone upgrade                       # Upgrade CLI tools to latest version
-php stone upgrade --check               # Check for available updates
-
 # Composer Shortcuts
 composer serve                          # Same as: php stone serve
 composer test                           # Same as: php stone test
@@ -214,9 +210,8 @@ composer migrate                        # Same as: php stone migrate verify
 ```
 
 > **📦 Keeping Up to Date:**
-> Run `composer update` to update the framework package.
-> Run `php stone upgrade` to update CLI tools and scripts.
-> See [UPGRADING.md](UPGRADING.md) for details.
+> Run `composer update` to update both the framework and CLI tools.
+> CLI scripts are now bundled with the framework package and auto-update!
 
 ## Environment Configuration
 

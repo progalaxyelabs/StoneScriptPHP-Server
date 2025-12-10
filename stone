@@ -81,10 +81,6 @@ $commands = [
         'description' => 'Start HTTP API server for code generation',
         'file' => 'cli/cli-server.php',
     ],
-    'upgrade' => [
-        'description' => 'Upgrade CLI tools to latest version',
-        'file' => 'cli/upgrade.php',
-    ],
 ];
 
 // Parse command
@@ -126,7 +122,6 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "  php stone generate model get_user.pgsql # Generate model from PostgreSQL function\n";
     echo "  php stone generate auth:google          # Generate Google OAuth\n";
     echo "  php stone migrate verify                # Check database drift\n";
-    echo "  php stone upgrade                       # Upgrade CLI tools to latest version\n";
     echo "\n";
     echo "Run 'php stone <command> --help' for detailed help on any command.\n";
     echo "\n";
@@ -225,16 +220,35 @@ if (isset($cmdInfo['handler'])) {
 
 // Execute external CLI script
 if (isset($cmdInfo['file'])) {
-    // Try cli/ directory first (new structure)
-    $scriptPath = ROOT_PATH . '/' . $cmdInfo['file'];
+    $scriptPath = null;
 
-    // Fallback to old Framework path if needed
-    if (!file_exists($scriptPath) && defined('FRAMEWORK_PATH')) {
-        $scriptPath = FRAMEWORK_PATH . '/' . $cmdInfo['file'];
+    // Priority 1: Framework package (v2.0.13+) - auto-updates with composer
+    $vendorCliPath = ROOT_PATH . 'vendor/progalaxyelabs/stonescriptphp/' . $cmdInfo['file'];
+    if (file_exists($vendorCliPath)) {
+        $scriptPath = $vendorCliPath;
     }
 
-    if (!file_exists($scriptPath)) {
-        echo Color::red("Error: Command script not found: $scriptPath") . "\n";
+    // Priority 2: Local cli/ directory (backward compatibility for v2.0.12 and earlier)
+    if (!$scriptPath) {
+        $localCliPath = ROOT_PATH . $cmdInfo['file'];
+        if (file_exists($localCliPath)) {
+            $scriptPath = $localCliPath;
+        }
+    }
+
+    // Priority 3: Old framework path (legacy)
+    if (!$scriptPath && defined('FRAMEWORK_PATH')) {
+        $frameworkPath = FRAMEWORK_PATH . '/' . $cmdInfo['file'];
+        if (file_exists($frameworkPath)) {
+            $scriptPath = $frameworkPath;
+        }
+    }
+
+    if (!$scriptPath) {
+        echo Color::red("Error: Command script not found: {$cmdInfo['file']}") . "\n";
+        echo "Tried:\n";
+        echo "  - $vendorCliPath\n";
+        echo "  - " . ROOT_PATH . $cmdInfo['file'] . "\n";
         exit(1);
     }
 
