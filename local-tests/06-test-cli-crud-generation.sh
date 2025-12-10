@@ -150,10 +150,10 @@ echo -e "${GREEN}  ✓ Database table schema created${NC}"
 
 # Step 6: Create database functions
 echo -e "\n${YELLOW}⚙️  Step 6: Creating database functions...${NC}"
-mkdir -p postgresql/functions
+mkdir -p src/postgresql/functions
 
 # Function: List all books
-cat > postgresql/functions/list_books.pssql <<'SQL'
+cat > src/postgresql/functions/list_books.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION list_books()
 RETURNS JSON AS $$
 BEGIN
@@ -178,7 +178,7 @@ $$ LANGUAGE plpgsql;
 SQL
 
 # Function: Get book by ID
-cat > postgresql/functions/get_book.pssql <<'SQL'
+cat > src/postgresql/functions/get_book.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION get_book(p_id INT)
 RETURNS JSON AS $$
 DECLARE
@@ -203,7 +203,7 @@ $$ LANGUAGE plpgsql;
 SQL
 
 # Function: Create book
-cat > postgresql/functions/create_book.pssql <<'SQL'
+cat > src/postgresql/functions/create_book.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION create_book(
     p_title VARCHAR,
     p_author VARCHAR,
@@ -232,7 +232,7 @@ $$ LANGUAGE plpgsql;
 SQL
 
 # Function: Update book
-cat > postgresql/functions/update_book.pssql <<'SQL'
+cat > src/postgresql/functions/update_book.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION update_book(
     p_id INT,
     p_title VARCHAR DEFAULT NULL,
@@ -270,7 +270,7 @@ $$ LANGUAGE plpgsql;
 SQL
 
 # Function: Delete book
-cat > postgresql/functions/delete_book.pssql <<'SQL'
+cat > src/postgresql/functions/delete_book.pssql <<'SQL'
 CREATE OR REPLACE FUNCTION delete_book(p_id INT)
 RETURNS JSON AS $$
 DECLARE
@@ -679,7 +679,7 @@ fi
 # Step 13: Initialize database
 echo -e "\n${YELLOW}💾 Step 13: Initializing database...${NC}"
 docker compose exec -T postgres psql -U books_user -d books_db < api/src/postgresql/tables/001_books.pssql
-for func in api/postgresql/functions/*.pssql; do
+for func in api/src/postgresql/functions/*.pssql; do
     docker compose exec -T postgres psql -U books_user -d books_db < "$func"
 done
 echo -e "${GREEN}  ✓ Database initialized with seed data${NC}"

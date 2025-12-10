@@ -21,20 +21,20 @@ if ($argc === 1 || ($argc === 2 && in_array($argv[1], ['--help', '-h', 'help']))
     echo "===============\n\n";
     echo "Usage: php generate model <filename.pssql>\n\n";
     echo "Arguments:\n";
-    echo "  filename.pssql    PostgreSQL function file in postgresql/functions/\n\n";
+    echo "  filename.pgsql    PostgreSQL function file in src/postgresql/functions/\n\n";
     echo "Example:\n";
-    echo "  php generate model get_user.pssql\n";
+    echo "  php generate model get_user.pgsql\n";
     exit(0);
 }
 
 if ($argc !== 2) {
     echo "Error: Invalid number of arguments\n";
-    echo "Usage: php generate model <filename.pssql>\n";
+    echo "Usage: php generate model <filename.pgsql>\n";
     echo "Run 'php generate model --help' for more information.\n";
     exit(1);
 }
 
-$src_filepath = ROOT_PATH . 'postgresql' . DIRECTORY_SEPARATOR . 'functions' . DIRECTORY_SEPARATOR . str_replace('..', '.', $argv[1]);
+$src_filepath = ROOT_PATH . 'src' . DIRECTORY_SEPARATOR . 'postgresql' . DIRECTORY_SEPARATOR . 'functions' . DIRECTORY_SEPARATOR . str_replace('..', '.', $argv[1]);
 
 if (!file_exists($src_filepath)) {
     echo 'file does not exist' . PHP_EOL;

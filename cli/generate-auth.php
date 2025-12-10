@@ -41,8 +41,8 @@ if ($argc === 1 || ($argc === 2 && in_array($argv[1], ['--help', '-h', 'help']))
     echo "This will create:\n";
     echo "  - Route handler in src/App/Routes/\n";
     echo "  - Config file in src/App/Config/\n";
-    echo "  - PostgreSQL table in postgresql/tables/\n";
-    echo "  - PostgreSQL function in postgresql/functions/\n";
+    echo "  - PostgreSQL table in src/postgresql/tables/\n";
+    echo "  - PostgreSQL function in src/postgresql/functions/\n";
     echo "  - Updates src/App/Config/routes.php\n";
     exit(0);
 }
@@ -85,8 +85,8 @@ echo "Generating $provider OAuth authentication...\n\n";
 $dirs = [
     'routes' => SRC_PATH . 'App' . DIRECTORY_SEPARATOR . 'Routes',
     'config' => CONFIG_PATH,
-    'postgresql_tables' => ROOT_PATH . 'postgresql' . DIRECTORY_SEPARATOR . 'tables',
-    'postgresql_functions' => ROOT_PATH . 'postgresql' . DIRECTORY_SEPARATOR . 'functions',
+    'postgresql_tables' => SRC_PATH . 'postgresql' . DIRECTORY_SEPARATOR . 'tables',
+    'postgresql_functions' => SRC_PATH . 'postgresql' . DIRECTORY_SEPARATOR . 'functions',
 ];
 
 foreach ($dirs as $name => $dir) {
