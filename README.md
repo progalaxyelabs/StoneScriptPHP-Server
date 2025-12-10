@@ -15,6 +15,8 @@ Application skeleton with everything you need to build production-ready PostgreS
 
 ## Quick Start
 
+### Local Development
+
 ```bash
 # Create a new project
 composer create-project progalaxyelabs/stonescriptphp-server my-api
@@ -24,6 +26,17 @@ cd my-api
 php stone serve
 # Your API is running at http://localhost:9100
 ```
+
+### Docker Deployment
+
+```bash
+# Start with Docker Compose (includes PostgreSQL)
+docker compose up -d
+
+# Your API is running at http://localhost:8000
+```
+
+See [DOCKER.md](DOCKER.md) for complete Docker documentation.
 
 The setup wizard will:
 1. Configure database connection
