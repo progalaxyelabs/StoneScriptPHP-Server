@@ -115,11 +115,15 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     }
     echo "\n";
     echo "Examples:\n";
-    echo "  php stone new my-api             # Create new project\n";
-    echo "  php stone setup                  # Interactive setup\n";
-    echo "  php stone serve                  # Start dev server\n";
-    echo "  php stone generate route login   # Generate login route\n";
-    echo "  php stone migrate verify         # Check database drift\n";
+    echo "  php stone new my-api                    # Create new project\n";
+    echo "  php stone setup                         # Interactive setup\n";
+    echo "  php stone serve                         # Start dev server\n";
+    echo "  php stone generate route login          # Generate login route\n";
+    echo "  php stone generate model get_user.pgsql # Generate model from PostgreSQL function\n";
+    echo "  php stone generate auth:google          # Generate Google OAuth\n";
+    echo "  php stone migrate verify                # Check database drift\n";
+    echo "\n";
+    echo "Run 'php stone <command> --help' for detailed help on any command.\n";
     echo "\n";
     exit(0);
 }
