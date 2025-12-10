@@ -1,0 +1,62 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Tests and development
+tests/
+local-tests/
+.phpunit.result.cache
+phpunit.xml
+
+# CI/CD
+.github/
+
+# Logs
+logs/*
+!logs/.gitkeep
+*.log
+
+# Environment files (should be mounted or passed as env vars)
+.env
+.env.local
+.env.*.local
+
+# Vendor (will be installed during build)
+# Uncomment if you want to install during build instead of copying
+# vendor/
+
+# Temporary files
+tmp/
+temp/
+cache/
+
+# Node modules (if any)
+node_modules/
+
+# Build artifacts
+*.tar
+*.zip
+
+# Database files (local development only)
+*.db
+*.sqlite
+
+# Server PID files
+.stone-server-*.pid
