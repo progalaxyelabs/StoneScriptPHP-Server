@@ -23,6 +23,10 @@ if ($isVendorMode) {
     define('IS_VENDOR_MODE', false);
 }
 
+// Define additional paths for CLI scripts
+define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
+define('CONFIG_PATH', SRC_PATH . 'App' . DIRECTORY_SEPARATOR . 'Config' . DIRECTORY_SEPARATOR);
+
 require_once ($isVendorMode ? $vendorDir : ROOT_PATH) . 'vendor/autoload.php';
 
 // CLI Colors
