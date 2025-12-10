@@ -110,10 +110,10 @@ $$ LANGUAGE plpgsql;
 ### 3. Generate PHP Model
 
 ```bash
-php stone generate model get_users.pssql
+php stone generate model get_users.pgsql
 ```
 
-This creates `FnGetUsers.php` in `src/App/Database/Functions/`
+This creates `FnGetUsers.php` in `src/App/Database/Functions/` from the PostgreSQL function in `src/postgresql/functions/get_users.pgsql`
 
 ### 4. Create Route Handler
 
@@ -170,25 +170,30 @@ This checks for database drift and ensures your schema matches your code.
 
 ```bash
 # Project Management
-php stone setup              # Interactive project setup
-php stone serve              # Start development server (port 9100)
-php stone env                # Generate .env file
+php stone setup                         # Interactive project setup
+php stone serve                         # Start development server (port 9100)
+php stone stop                          # Stop development server
+php stone env                           # Generate .env file
 
 # Code Generation
-php stone generate route <name>      # Generate route handler
-php stone generate model <file.pssql> # Generate model from SQL function
+php stone generate route <name>         # Generate route handler
+php stone generate model <file.pgsql>   # Generate model from PostgreSQL function
+php stone generate auth:google          # Generate Google OAuth authentication
+php stone generate auth:linkedin        # Generate LinkedIn OAuth authentication
+php stone generate auth:apple           # Generate Apple OAuth authentication
+php stone generate client               # Generate TypeScript client
 
 # Database
-php stone migrate verify     # Check database drift
-php stone migrate run        # Apply migrations
+php stone migrate verify                # Check database drift
+php stone migrate run                   # Apply migrations (not yet implemented)
 
 # Testing
-php stone test               # Run PHPUnit test suite
+php stone test                          # Run PHPUnit test suite
 
 # Composer Shortcuts
-composer serve               # Same as: php stone serve
-composer test                # Same as: php stone test
-composer migrate             # Same as: php stone migrate verify
+composer serve                          # Same as: php stone serve
+composer test                           # Same as: php stone test
+composer migrate                        # Same as: php stone migrate verify
 ```
 
 ## Environment Configuration
