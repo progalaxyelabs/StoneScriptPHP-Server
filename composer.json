@@ -46,6 +46,12 @@
     },
     "bin": ["stone"],
     "scripts": {
+        "post-install-cmd": [
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\""
+        ],
+        "post-update-cmd": [
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\""
+        ],
         "post-create-project-cmd": [
             "@php stone setup"
         ],
