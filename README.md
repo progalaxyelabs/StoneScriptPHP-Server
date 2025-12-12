@@ -38,10 +38,38 @@ docker compose up -d
 
 See [DOCKER.md](DOCKER.md) for complete Docker documentation.
 
-The setup wizard will:
-1. Configure database connection
-2. Generate JWT keypair for authentication
-3. Create `.env` file with defaults
+## JWT Authentication Setup
+
+After installing, set up JWT authentication:
+
+### Option 1: Automatic (Recommended)
+```bash
+php stone setup
+```
+
+The setup wizard will configure database connection, generate JWT keypair, and create your `.env` file.
+
+### Option 2: JWT Keys Only
+```bash
+php stone generate jwt
+```
+
+Generates RSA public/private keypair for JWT authentication in distributed systems.
+
+### Option 3: Manual Setup
+
+1. Generate a secret key:
+```bash
+php -r "echo bin2hex(random_bytes(32));"
+```
+
+2. Add to `.env`:
+```bash
+JWT_SECRET=your-generated-secret-here
+JWT_EXPIRY=3600
+```
+
+See `docs/authentication.md` for advanced RSA key setup and usage examples.
 
 ## What's Included
 
@@ -193,6 +221,7 @@ php stone setup                         # Interactive project setup
 php stone serve                         # Start development server (port 9100)
 php stone stop                          # Stop development server
 php stone env                           # Generate .env file
+php stone generate jwt                  # Generate JWT authentication keys
 
 # Code Generation (tools in framework package)
 php stone generate route <name>         # Generate route handler

@@ -81,6 +81,10 @@ $commands = [
         'description' => 'Generate .env file',
         'file' => 'cli/generate-env.php',
     ],
+    'upgrade' => [
+        'description' => 'Upgrade CLI tools from latest release',
+        'file' => 'cli/upgrade.php',
+    ],
     'cli-server' => [
         'description' => 'Start HTTP API server for code generation',
         'file' => 'cli/cli-server.php',
@@ -106,6 +110,8 @@ if ($command === 'generate' && !empty($args)) {
         $commands['generate']['file'] = 'cli/generate-client.php';
     } elseif ($subCommand === 'env') {
         $commands['generate']['file'] = 'cli/generate-env.php';
+    } elseif ($subCommand === 'jwt') {
+        $commands['generate']['file'] = 'cli/generate-jwt-keys.php';
     }
 }
 
@@ -122,6 +128,9 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "  php stone new my-api                    # Create new project\n";
     echo "  php stone setup                         # Interactive setup\n";
     echo "  php stone serve                         # Start dev server\n";
+    echo "  php stone upgrade                       # Upgrade CLI tools\n";
+    echo "  php stone upgrade --check               # Check for updates\n";
+    echo "  php stone generate jwt                  # Generate JWT keys\n";
     echo "  php stone generate route login          # Generate login route\n";
     echo "  php stone generate model get_user.pgsql # Generate model from PostgreSQL function\n";
     echo "  php stone generate auth:google          # Generate Google OAuth\n";
