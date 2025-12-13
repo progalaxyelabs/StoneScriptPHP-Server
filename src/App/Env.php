@@ -2,12 +2,12 @@
 
 namespace App;
 
-use Framework\Env as FrameworkEnv;
+use StoneScriptPHP\Env as FrameworkEnv;
 
 /**
  * Application Environment Configuration
  *
- * Extends Framework\Env to add application-specific environment variables.
+ * Extends StoneScriptPHP\Env to add application-specific environment variables.
  * The framework handles core variables (DEBUG_MODE, TIMEZONE, DATABASE_*, etc.)
  * Add your application-specific variables here.
  */

@@ -1,7 +1,7 @@
 <?php
 
-use Framework\Logger;
-use Framework\Router;
+use StoneScriptPHP\Logger;
+use StoneScriptPHP\Router;
 
 // Define constants BEFORE loading composer autoloader
 define('INDEX_START_TIME', microtime(true));
@@ -14,11 +14,11 @@ if (!defined('DEBUG_MODE')) {
     define('DEBUG_MODE', ($_SERVER['DEBUG_MODE'] ?? 'false') === 'true');
 }
 
-// Load composer autoloader (includes functions.php via autoload.files)
+// Load composer autoloader (includes helpers.php and bootstrap.php via autoload.files)
 require_once ROOT_PATH . 'vendor/autoload.php';
 
 // Initialize Env (this will redefine DEBUG_MODE with value from .env)
-use Framework\Env;
+use StoneScriptPHP\Env;
 Env::get_instance();
 
 enum RequestMethod : string {

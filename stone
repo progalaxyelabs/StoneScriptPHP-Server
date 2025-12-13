@@ -7,23 +7,25 @@
  * Usage: php stone <command> [options]
  */
 
-// Detect installation mode
+// Detect installation mode and set up paths
 $isVendorMode = strpos(__DIR__, 'vendor/progalaxyelabs/stonescriptphp') !== false;
 
 if ($isVendorMode) {
-    // Installed via composer require - running from vendor/bin/stone
-    $vendorDir = dirname(dirname(__DIR__));
-    define('ROOT_PATH', dirname($vendorDir) . DIRECTORY_SEPARATOR);
-    define('FRAMEWORK_PATH', __DIR__ . '/Framework');
+    // Running from vendor/progalaxyelabs/stonescriptphp/stone
+    // This happens when framework is installed via Composer in a project
+    $vendorDir = dirname(dirname(__DIR__)); // vendor/
+    $projectRoot = dirname($vendorDir);      // project root
+    define('ROOT_PATH', $projectRoot . DIRECTORY_SEPARATOR);
     define('IS_VENDOR_MODE', true);
 } else {
-    // Installed via composer create-project - running from project root
+    // Running from framework development repository
+    // This happens when working on the framework itself
     define('ROOT_PATH', __DIR__ . DIRECTORY_SEPARATOR);
-    define('FRAMEWORK_PATH', ROOT_PATH . 'Framework');
     define('IS_VENDOR_MODE', false);
 }
 
-// Define additional paths for CLI scripts
+// Define project paths
+// SRC_PATH points to the project's src/ directory (where App\ namespace lives)
 define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
 define('CONFIG_PATH', SRC_PATH . 'App' . DIRECTORY_SEPARATOR . 'Config' . DIRECTORY_SEPARATOR);
 
@@ -54,7 +56,7 @@ $commands = [
         'file' => 'cli/init.php',
     ],
     'setup' => [
-        'description' => 'Interactive project setup (run after composer create-project)',
+        'description' => 'Interactive project setup (run after composer create-project). Use --quiet to skip prompts',
         'file' => 'cli/setup.php',
     ],
     'serve' => [
@@ -81,13 +83,13 @@ $commands = [
         'description' => 'Generate .env file',
         'file' => 'cli/generate-env.php',
     ],
-    'upgrade' => [
-        'description' => 'Upgrade CLI tools from latest release',
-        'file' => 'cli/upgrade.php',
-    ],
     'cli-server' => [
         'description' => 'Start HTTP API server for code generation',
         'file' => 'cli/cli-server.php',
+    ],
+    'tenant' => [
+        'description' => 'Manage multi-tenant databases (create, list, migrate, etc.)',
+        'file' => 'cli/tenant.php',
     ],
 ];
 
@@ -128,13 +130,13 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "  php stone new my-api                    # Create new project\n";
     echo "  php stone setup                         # Interactive setup\n";
     echo "  php stone serve                         # Start dev server\n";
-    echo "  php stone upgrade                       # Upgrade CLI tools\n";
-    echo "  php stone upgrade --check               # Check for updates\n";
-    echo "  php stone generate jwt                  # Generate JWT keys\n";
     echo "  php stone generate route login          # Generate login route\n";
     echo "  php stone generate model get_user.pgsql # Generate model from PostgreSQL function\n";
     echo "  php stone generate auth:google          # Generate Google OAuth\n";
+    echo "  php stone generate jwt                  # Generate JWT RSA keys\n";
     echo "  php stone migrate verify                # Check database drift\n";
+    echo "  php stone tenant:create \"Acme\" acme    # Create new tenant\n";
+    echo "  php stone tenant:list                   # List all tenants\n";
     echo "\n";
     echo "Run 'php stone <command> --help' for detailed help on any command.\n";
     echo "\n";
