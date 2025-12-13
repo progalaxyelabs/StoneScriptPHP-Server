@@ -27,7 +27,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "progalaxyelabs/stonescriptphp": "^2.0",
+        "progalaxyelabs/stonescriptphp": "^2.1",
         "phpoffice/phpspreadsheet": "^5.0",
         "google/apiclient": "^2.0"
     },
