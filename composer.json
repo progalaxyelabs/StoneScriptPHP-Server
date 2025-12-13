@@ -18,6 +18,11 @@
         "source": "https://github.com/progalaxyelabs/StoneScriptPHP-Server",
         "docs": "https://stonescriptphp.org/docs"
     },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "2.1.x-dev"
+        }
+    },
     "authors": [
         {
             "name": "StoneScriptPHP Team",
