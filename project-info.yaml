@@ -1,0 +1,476 @@
+# Project Information File
+# StoneScriptPHP Server - Application Skeleton & Reference Implementation
+# Location: /ssd2/projects/progalaxy-elabs/opensource/stonescriptphp/StoneScriptPHP-Server/
+
+project:
+  name: StoneScriptPHP Server
+  version: 2.1.x
+  description: |
+    Production-ready application skeleton and reference implementation for building
+    PostgreSQL-based REST APIs with the StoneScriptPHP framework. Includes complete
+    project structure, CLI tools, authentication, database integration, and Docker support.
+
+  purpose: |
+    The StoneScriptPHP Server provides:
+    - Ready-to-use project template for new API development
+    - Reference implementation of StoneScriptPHP best practices
+    - Complete development and deployment infrastructure
+    - CLI tools for code generation and development workflow
+
+  homepage: https://stonescriptphp.org
+  repository: https://github.com/progalaxyelabs/StoneScriptPHP-Server
+  documentation: https://stonescriptphp.org/docs
+
+  license: MIT
+  authors:
+    - name: StoneScriptPHP Team
+      email: team@progalaxyelabs.com
+      homepage: https://stonescriptphp.org
+
+# Technology Stack
+technology:
+  language: PHP
+  language_version: ">=8.2"
+
+  framework: StoneScriptPHP
+  framework_version: "^2.1"
+  framework_repository: https://github.com/progalaxyelabs/StoneScriptPHP
+
+  database: PostgreSQL
+  database_version: ">=13"
+
+  authentication:
+    - type: JWT      
+    - type: OAuth2
+      providers:
+        - Google
+        - LinkedIn
+        - Apple
+
+  caching: Redis
+  caching_optional: true
+
+  container: Docker
+  docker_compose_version: "3.8"
+
+  package_manager: Composer
+  testing_framework: PHPUnit
+  testing_version: "^11.0"
+
+# Core Features
+features:
+  - PostgreSQL-first architecture with business logic in SQL functions
+  - Type-safe PHP models auto-generated from PostgreSQL functions
+  - JWT and OAuth2 authentication support
+  - Role-based access control (RBAC)
+  - CLI tools for route and model generation
+  - Environment-based configuration with type validation
+  - Request validation framework
+  - CORS support with configurable origins
+  - Comprehensive error handling and logging
+  - Docker development and production environments
+  - Hot-reload support for local development
+  - PHPUnit testing framework
+  - Environment configuration type validation
+
+# Project Structure
+structure:
+  src:
+    description: Application source code
+    subdirectories:
+      App:
+        description: Main application namespace
+        subdirectories:
+          Config:
+            description: Configuration files
+            files:
+              - routes.php
+              - allowed-origins.php
+              - google-oauth.php
+          Routes:
+            description: HTTP request handlers
+            examples:
+              - HomeRoute.php
+              - GoogleOauthRoute.php
+          Services:
+            description: Business logic layer
+          Models:
+            description: Data models and domain objects
+            core:
+              - User.php
+              - Role.php
+              - Permission.php
+              - MyTokenClaims.php
+          Database:
+            description: Database models and schemas
+            subdirectories:
+              Functions:
+                description: Auto-generated PHP models wrapping PostgreSQL functions
+              postgres:
+                description: PostgreSQL database definitions
+                subdirectories:
+                  tables:
+                    description: Table schemas (.pssql files)
+                  functions:
+                    description: SQL functions (.pssql files)
+                  seeds:
+                    description: Database seed data
+          Lib:
+            description: Library integrations
+            examples:
+              - MyZeptoMail.php
+          Env.php: Type-safe environment configuration
+
+  tests:
+    description: PHPUnit test suites
+
+  public:
+    description: Web-accessible directory
+    files:
+      - index.php
+
+  vendor:
+    description: Composer dependencies
+    special: stonescriptphp framework and CLI tools
+
+  docker-compose.yml: Development environment orchestration
+  Dockerfile: Container image definition
+  composer.json: PHP dependencies and project metadata
+  stone: CLI entry point script
+  .env: Environment variables (development)
+  README.md: Quick start guide
+  HLD.md: High-level design documentation
+  project-info.yaml: This file
+
+# API Structure
+api:
+  format: JSON
+  base_url: /
+
+  response_format:
+    success: boolean
+    data: object
+    message: string
+    errors: object
+
+  standard_endpoints:
+    - path: /
+      method: GET
+      handler: HomeRoute
+      description: Home endpoint
+
+  auth_endpoints:
+    - path: /auth/google
+      method: POST
+      handler: GoogleOauthRoute
+      description: Google OAuth authentication
+
+  middleware:
+    - auth: JWT authentication
+    - validation: Request validation rules
+    - cors: Cross-origin resource sharing
+
+  response_helpers:
+    - res_ok()
+    - res_created()
+    - res_error()
+    - res_unauthorized()
+    - res_forbidden()
+    - res_not_found()
+    - res_validation_error()
+
+  request_helpers:
+    - request()
+    - request_all()
+    - request_only()
+    - request_except()
+    - has_param()
+
+  auth_helpers:
+    - auth()
+    - auth()->user()
+    - auth()->token()
+    - check_permission()
+
+# CLI Commands
+cli:
+  description: Stone CLI tool for development and code generation
+  entry_point: php stone or composer
+
+  commands:
+    setup:
+      description: Interactive project setup wizard
+      command: php stone setup
+
+    serve:
+      description: Start development server
+      command: php stone serve
+      port: 9100
+
+    stop:
+      description: Stop development server
+      command: php stone stop
+
+    env:
+      description: Generate .env file
+      command: php stone env
+
+    generate_jwt:
+      description: Generate JWT keypair
+      command: php stone generate jwt
+
+    generate_route:
+      description: Generate route handler
+      command: php stone generate route <name>
+
+    generate_model:
+      description: Generate model from PostgreSQL function
+      command: php stone generate model <file.pgsql>
+
+    generate_client:
+      description: Generate TypeScript client
+      command: php stone generate client
+
+    generate_auth_google:
+      description: Generate Google OAuth handler
+      command: php stone generate auth:google
+
+    generate_auth_linkedin:
+      description: Generate LinkedIn OAuth handler
+      command: php stone generate auth:linkedin
+
+    generate_auth_apple:
+      description: Generate Apple OAuth handler
+      command: php stone generate auth:apple
+
+    migrate_verify:
+      description: Verify database schema
+      command: php stone migrate verify
+
+    test:
+      description: Run PHPUnit tests
+      command: php stone test
+
+# Docker Configuration
+docker:
+  compose_services:
+    postgres:
+      image: postgres:16-alpine
+      container_name: stonescriptphp-db
+      port: 5432
+      environment_variables:
+        POSTGRES_DB: stonescriptphp
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+        - ./src/postgresql/tables:/docker-entrypoint-initdb.d/01-tables:ro
+        - ./src/postgresql/functions:/docker-entrypoint-initdb.d/02-functions:ro
+
+    app:
+      image: PHP 8.3 CLI based
+      container_name: stonescriptphp-app
+      port: 8000
+      depends_on:
+        - postgres
+      volumes:
+        - .:/var/www/html
+        - ./logs:/var/www/html/logs
+      healthcheck:
+        endpoint: http://localhost:8000/api/health
+
+  development:
+    command: docker compose up -d
+    api_url: http://localhost:8000
+    hot_reload: true
+
+  production:
+    uses_env_file: .env.production
+    recommended_registry: Docker Hub or private registry
+    environment_mode: production
+
+# Development Setup
+development:
+  prerequisites:
+    - PHP >= 8.2
+    - PostgreSQL >= 13
+    - Composer
+    - Docker & Docker Compose (optional)
+
+  php_extensions_required:
+    - pdo
+    - pdo_pgsql
+    - json
+    - openssl
+
+  php_extensions_optional:
+    - redis
+    - gd
+    - zip
+
+  quick_start: |
+    1. composer create-project progalaxyelabs/stonescriptphp-server my-api
+    2. cd my-api
+    3. php stone setup
+    4. php stone serve
+    5. Visit http://localhost:9100
+
+  alternative_docker: |
+    1. docker compose up -d
+    2. Visit http://localhost:8000
+
+# Dependencies
+dependencies:
+  core:
+    - progalaxyelabs/stonescriptphp: ^2.1
+    - phpoffice/phpspreadsheet: ^5.0
+    - google/apiclient: ^2.0
+
+  development:
+    - phpunit/phpunit: ^11.0
+
+# Configuration
+configuration:
+  environment_variables: src/App/Env.php
+
+  application_variables:
+    - APP_NAME: Application name
+    - APP_ENV: Environment mode (development, staging, production)
+    - APP_PORT: Development server port
+    - APP_DEBUG: Debug mode flag
+
+  database_variables:
+    - DATABASE_HOST: Database hostname
+    - DATABASE_PORT: Database port
+    - DATABASE_USER: Database user
+    - DATABASE_PASSWORD: Database password
+
+  authentication_variables:
+    - JWT_PRIVATE_KEY_PATH: Path to JWT private key
+    - JWT_PUBLIC_KEY_PATH: Path to JWT public key
+    - JWT_EXPIRY: JWT token expiry in seconds
+    - GOOGLE_CLIENT_ID: Google OAuth client ID
+
+  security_variables:
+    - ALLOWED_ORIGINS: Comma-separated CORS origins
+
+# Development Workflow
+workflow:
+  step_1: Define database schema in src/postgresql/tables/*.pssql
+  step_2: Create SQL functions in src/postgresql/functions/*.pssql
+  step_3: Generate PHP model with php stone generate model <file.pgsql>
+  step_4: Generate route with php stone generate route <name>
+  step_5: Implement route logic and validation
+  step_6: Map route to URL in src/App/Config/routes.php
+  step_7: Run php stone migrate verify
+  step_8: Test API endpoint
+
+# Testing
+testing:
+  framework: PHPUnit
+  location: tests/
+  command: php stone test or composer test
+  run_in_docker: docker compose exec app php stone test
+
+# Performance Considerations
+performance:
+  caching_layer: Redis (optional)
+  database_optimization: SQL function indexing
+  horizontal_scaling: Stateless application design
+  load_balancing: Supported via Docker/Kubernetes
+
+# Security Features
+security:
+  authentication:
+    - JWT with RSA keypairs
+    - OAuth2 support
+
+  authorization:
+    - Role-based access control (RBAC)
+    - Permission-based checks
+
+  input_validation:
+    - Request validation framework
+    - CORS configuration
+
+  environment_security:
+    - Type-safe environment variables
+    - .env file handling
+
+  best_practices:
+    - Business logic in database (SQL)
+    - Thin route layer
+    - Input validation
+    - Error handling
+    - No hardcoded secrets
+
+# Deployment Options
+deployment:
+  local:
+    command: php stone serve
+    port: 9100
+
+  docker_development:
+    command: docker compose up -d
+    port: 8000
+
+  docker_production:
+    base_image: PHP 8.3 CLI
+    registry: Docker Hub or private
+    environment_file: .env.production
+
+  kubernetes:
+    ready: true
+    manifests: Optional k8s/ directory
+
+# Maintenance & Updates
+maintenance:
+  framework_updates: composer update progalaxyelabs/stonescriptphp
+  framework_location: vendor/progalaxyelabs/stonescriptphp/
+  application_code_location: src/
+  update_preservation: Application code in src/ is preserved during updates
+  versioning_strategy: Semantic versioning with ^2.0 compatibility
+
+# Support & Community
+support:
+  website: https://stonescriptphp.org
+  documentation: https://stonescriptphp.org/docs
+  issues: https://github.com/progalaxyelabs/StoneScriptPHP-Server/issues
+  discussions: https://github.com/progalaxyelabs/StoneScriptPHP/discussions
+  getting_started: https://stonescriptphp.org/docs/getting-started
+
+# Related Projects
+related:
+  - name: StoneScriptPHP (Core Framework)
+    url: https://github.com/progalaxyelabs/StoneScriptPHP
+    description: Core framework package
+
+  - name: StoneScriptPHP Documentation
+    url: https://stonescriptphp.org/docs
+    description: Complete documentation and API reference
+
+# File Checksums & Validation
+validation:
+  hld_file:
+    name: HLD.md
+    location: /StoneScriptPHP-Server/HLD.md
+    required: true
+    format: Markdown
+    validates:
+      - Project purpose
+      - Architecture overview
+      - Data flow diagrams
+      - How to use guide
+      - API structure
+      - Technology stack
+
+  project_info_file:
+    name: project-info.yaml
+    location: /StoneScriptPHP-Server/project-info.yaml
+    required: true
+    format: YAML
+    validates:
+      - Valid YAML syntax
+      - All required fields present
+      - Accurate technology information
+      - Correct paths and URLs

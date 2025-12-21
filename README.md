@@ -1,460 +1,294 @@
-# ✅ StoneScriptPHP Server - Start Here!
+# StoneScriptPHP Server
 
-**This is the recommended starting point for building APIs with StoneScriptPHP.**
+**A minimal, composable API server skeleton for building PostgreSQL-backed REST APIs.**
 
-Application skeleton with everything you need to build production-ready PostgreSQL APIs. The core framework ([stonescriptphp](https://github.com/progalaxyelabs/StoneScriptPHP)) is automatically installed as a dependency.
+Clean starting point with zero bloat - add only what you need through CLI commands.
 
-## 📦 Package Ecosystem
+## Features
 
-| Package | Purpose | When to Use |
-|---------|---------|-------------|
-| **[stonescriptphp-server](https://github.com/progalaxyelabs/StoneScriptPHP-Server)** | Application skeleton | ✅ **You are here** - Creating new projects |
-| **[stonescriptphp](https://github.com/progalaxyelabs/StoneScriptPHP)** | Core framework | Advanced - Framework development, custom integrations |
+- 🎯 **Minimal by default** - Only database connection, no pre-configured auth or models
+- 🔧 **Composable authentication** - Choose email/password, OAuth, API keys, or combine them
+- 📦 **Migration-based** - Version-controlled database schema
+- 🚀 **Production-ready** - Docker support, RBAC, JWT, rate limiting
+- ⚡ **Developer-friendly** - CLI code generation, hot reload
 
 ---
 
 ## Quick Start
 
-### Local Development
+### 1. Create Project
 
 ```bash
-# Create a new project
+composer create-project progalaxyelabs/stonescriptphp-server my-api
+cd my-api
+```
+
+### 2. Setup Environment
+
+```bash
+# Interactive setup wizard (recommended)
+php stone setup
+
+# Or manually create .env with database credentials
+cp .env.example .env
+```
+
+### 3. Choose Your Authentication
+
+**Email/Password Authentication:**
+```bash
+php stone generate auth:email-password
+php stone migrate up
+php stone seed rbac
+php stone create:admin
+```
+
+**Google OAuth:**
+```bash
+php stone generate auth:google
+php stone migrate up
+```
+
+**API Keys:**
+```bash
+php stone generate auth:api-key
+php stone migrate up
+```
+
+**Or combine multiple methods!**
+
+### 4. Start Development
+
+```bash
+php stone serve
+# API running at http://localhost:9100
+```
+
+---
+
+## Architecture
+
+**What's included by default:**
+- Database connection setup
+- Routing infrastructure
+- Environment configuration
+- Docker setup
+- CLI tools
+
+**What's NOT included (generate as needed):**
+- ❌ No authentication routes
+- ❌ No user models or tables
+- ❌ No default roles or permissions
+- ❌ No seeders
+
+**Philosophy:** Start minimal, add incrementally via CLI commands.
+
+---
+
+## CLI Commands
+
+### Authentication
+
+```bash
+# Generate authentication methods (composable)
+php stone generate auth:email-password    # Traditional auth
+php stone generate auth:google            # Google OAuth
+php stone generate auth:linkedin          # LinkedIn OAuth
+php stone generate auth:apple             # Apple OAuth
+php stone generate auth:api-key           # API key auth
+```
+
+### Database
+
+```bash
+php stone migrate status    # Check migration status
+php stone migrate up        # Run pending migrations
+php stone migrate down      # Rollback last batch
+php stone migrate verify    # Check for schema drift
+```
+
+### Seeding
+
+```bash
+php stone seed rbac         # Seed roles & permissions
+```
+
+### User Management
+
+```bash
+php stone create:admin      # Create system admin (interactive)
+```
+
+### Code Generation
+
+```bash
+php stone generate route POST /auth/login       # Generate route handler
+php stone generate model get_user.pgsql         # Generate model from SQL function
+php stone generate client                       # Generate TypeScript client
+php stone generate jwt                          # Generate JWT keypair
+```
+
+### Development
+
+```bash
+php stone serve             # Start dev server
+php stone stop              # Stop dev server
+php stone test              # Run tests
+```
+
+---
+
+## Example Workflow
+
+**Building an API with email/password auth:**
+
+```bash
+# 1. Create project
 composer create-project progalaxyelabs/stonescriptphp-server my-api
 cd my-api
 
-# Start development server
+# 2. Setup database
+php stone setup
+
+# 3. Add email/password authentication
+php stone generate auth:email-password
+
+# 4. Run migrations
+php stone migrate up
+
+# 5. Seed RBAC (roles & permissions)
+php stone seed rbac
+
+# 6. Create admin user
+php stone create:admin
+# Enter: admin@example.com, password, Admin User
+
+# 7. Start server
 php stone serve
-# Your API is running at http://localhost:9100
+
+# 8. Test login
+curl -X POST http://localhost:9100/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"your-password"}'
 ```
 
-### Docker Deployment
+---
+
+## Migrations
+
+Migrations are stored in `migrations/` and run in order:
+
+```
+migrations/
+├── 001_create_users_table.sql           # Base users table
+├── 002_add_email_password_auth.sql      # Email/password columns
+├── 003_add_oauth_providers.sql          # OAuth providers table
+├── 004_create_api_keys_table.sql        # API keys table
+└── 005_create_rbac_tables.sql           # RBAC tables
+```
+
+Each `generate auth:*` command adds the necessary migrations. They're composable - run in any order!
+
+---
+
+## Docker Deployment
 
 ```bash
-# Start with Docker Compose (includes PostgreSQL)
+# Start with docker-compose
 docker compose up -d
 
-# Your API is running at http://localhost:8000
+# Run migrations inside container
+docker exec -it stonescriptphp-app php stone migrate up
+
+# Create admin user
+docker exec -it stonescriptphp-app php stone create:admin
 ```
 
-See [DOCKER.md](DOCKER.md) for complete Docker documentation.
+See `docker-compose.yaml` for configuration.
 
-## JWT Authentication Setup
+---
 
-After installing, set up JWT authentication:
+## Default Roles (after `php stone seed rbac`)
 
-### Option 1: Automatic (Recommended)
-```bash
-php stone setup
-```
+| Role | Permissions |
+|------|-------------|
+| `super_admin` | All permissions |
+| `admin` | Most permissions except critical ones |
+| `moderator` | Content management + user viewing |
+| `user` | Basic content permissions |
+| `guest` | Read-only access |
 
-The setup wizard will configure database connection, generate JWT keypair, and create your `.env` file.
+Customize by editing the seeder or creating your own roles.
 
-### Option 2: JWT Keys Only
-```bash
-php stone generate jwt
-```
+---
 
-Generates RSA public/private keypair for JWT authentication in distributed systems.
+## Environment Variables
 
-### Option 3: Manual Setup
+Required variables (created by `php stone setup`):
 
-1. Generate a secret key:
-```bash
-php -r "echo bin2hex(random_bytes(32));"
-```
+```env
+# App
+APP_NAME=StoneScriptPHP
+APP_ENV=development
+APP_PORT=9100
 
-2. Add to `.env`:
-```bash
-JWT_SECRET=your-generated-secret-here
+# Database
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USER=postgres
+DATABASE_PASSWORD=your-password
+DATABASE_DBNAME=your-database
+
+# JWT (auto-generated)
+JWT_PRIVATE_KEY_PATH=./keys/jwt-private.pem
+JWT_PUBLIC_KEY_PATH=./keys/jwt-public.pem
 JWT_EXPIRY=3600
+
+# Optional: OAuth
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
 ```
 
-See `docs/authentication.md` for advanced RSA key setup and usage examples.
-
-## What's Included
-
-This skeleton provides everything you need:
-
-✅ **Core Framework** - The [stonescriptphp](https://github.com/progalaxyelabs/StoneScriptPHP) framework with bundled CLI tools
-✅ **CLI Entry Point** - `stone` script that executes CLI tools from framework package
-✅ **Project Structure** - Organized folders for routes, models, database, and configuration
-✅ **Example Routes** - Sample `HomeRoute` to demonstrate the pattern
-✅ **Environment Setup** - Type-safe `.env` configuration with validation
-✅ **Database Templates** - Folders for PostgreSQL tables, functions, and migrations
-✅ **Authentication Ready** - JWT configuration with keypair generation
-✅ **Testing Setup** - PHPUnit configured and ready to use
+---
 
 ## Project Structure
 
 ```
 my-api/
+├── migrations/              # Database migrations (generated)
+├── public/
+│   └── index.php           # Entry point
 ├── src/
-│   └── App/
-│       ├── Config/
-│       │   └── routes.php          # URL-to-route mappings
-│       ├── Routes/                 # Route handlers
-│       │   └── HomeRoute.php       # Example route
-│       ├── Services/               # Business logic layer
-│       ├── Database/
-│       │   ├── Functions/          # Generated PHP models
-│       │   └── postgres/
-│       │       ├── tables/         # Table schemas (.pssql)
-│       │       ├── functions/      # SQL functions (.pssql)
-│       │       └── seeds/          # Seed data
-│       └── Env.php                 # Application environment config
-├── vendor/
-│   └── progalaxyelabs/
-│       └── stonescriptphp/         # ← Framework + CLI tools live here
-│           ├── cli/                # ← CLI generators (auto-update with composer)
-│           ├── Database.php
-│           ├── Router.php
-│           └── ...
-├── tests/                          # PHPUnit tests
-├── stone                           # CLI entry point (executes tools from vendor/)
-├── .env                            # Environment variables
-└── composer.json
+│   ├── App/
+│   │   ├── Routes/         # Route handlers
+│   │   │   └── Auth/       # Auth routes (generated)
+│   │   ├── Models/         # Domain models (generated)
+│   │   └── Config/         # Configuration
+│   │       └── routes.php  # Route definitions
+│   └── config/
+│       └── allowed-origins.php  # CORS config
+├── composer.json
+├── docker-compose.yaml
+└── .env
 ```
-
-## Development Workflow
-
-### 1. Define Database Schema
-
-Create table in `src/App/Database/postgres/tables/`:
-
-```sql
--- users_table.pssql
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### 2. Create SQL Functions
-
-Create function in `src/App/Database/postgres/functions/`:
-
-```sql
--- get_users.pssql
-CREATE OR REPLACE FUNCTION get_users()
-RETURNS TABLE (
-    id INTEGER,
-    name VARCHAR(100),
-    email VARCHAR(255)
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT u.id, u.name, u.email
-    FROM users u
-    ORDER BY u.id DESC;
-END;
-$$ LANGUAGE plpgsql;
-```
-
-### 3. Generate PHP Model
-
-```bash
-php stone generate model get_users.pgsql
-```
-
-This creates `FnGetUsers.php` in `src/App/Database/Functions/` from the PostgreSQL function in `src/postgresql/functions/get_users.pgsql`
-
-### 4. Create Route Handler
-
-```bash
-php stone generate route get-users
-```
-
-This creates `GetUsersRoute.php` in `src/App/Routes/`
-
-### 5. Map URL to Route
-
-Edit `src/App/Config/routes.php`:
-
-```php
-return [
-    'GET' => [
-        '/api/users' => GetUsersRoute::class,
-    ],
-    'POST' => [
-        // Add POST routes here
-    ],
-];
-```
-
-### 6. Implement Route Logic
-
-Edit the generated route class:
-
-```php
-class GetUsersRoute implements IRouteHandler
-{
-    public function validation_rules(): array
-    {
-        return []; // No validation for GET
-    }
-
-    public function process(): ApiResponse
-    {
-        $users = FnGetUsers::run();
-        return res_ok(['users' => $users]);
-    }
-}
-```
-
-### 7. Run Migrations
-
-```bash
-php stone migrate verify
-```
-
-This checks for database drift and ensures your schema matches your code.
-
-## CLI Commands
-
-**Architecture (v2.0.13+):** The `stone` script in this package is just an entry point. All CLI tools live in `vendor/progalaxyelabs/stonescriptphp/cli/` and auto-update with `composer update`.
-
-```bash
-# Project Management
-php stone setup                         # Interactive project setup
-php stone serve                         # Start development server (port 9100)
-php stone stop                          # Stop development server
-php stone env                           # Generate .env file
-php stone generate jwt                  # Generate JWT authentication keys
-
-# Code Generation (tools in framework package)
-php stone generate route <name>         # Generate route handler
-php stone generate model <file.pgsql>   # Generate model from PostgreSQL function
-php stone generate auth:google          # Generate Google OAuth authentication
-php stone generate auth:linkedin        # Generate LinkedIn OAuth authentication
-php stone generate auth:apple           # Generate Apple OAuth authentication
-php stone generate client               # Generate TypeScript client
-
-# Database
-php stone migrate verify                # Check database drift
-php stone migrate run                   # Apply migrations (not yet implemented)
-
-# Testing
-php stone test                          # Run PHPUnit test suite
-
-# Composer Shortcuts
-composer serve                          # Same as: php stone serve
-composer test                           # Same as: php stone test
-composer migrate                        # Same as: php stone migrate verify
-```
-
-> **📦 Keeping Up to Date:**
-> Run `composer update` to update both the framework and CLI tools.
-> All CLI generators are bundled with the framework package and auto-update!
-> No manual upgrade needed - just `composer update`!
-
-## Environment Configuration
-
-The server extends the framework's `Env` class to add application-specific variables:
-
-```php
-use Framework\Env;
-
-$env = Env::get_instance();  // Returns App\Env instance
-
-// Framework variables (inherited)
-$env->DEBUG_MODE;            // bool
-$env->DATABASE_HOST;         // string
-$env->DATABASE_PORT;         // int
-$env->DATABASE_USER;         // string
-$env->DATABASE_PASSWORD;     // string
-
-// Application variables (from App\Env)
-$env->APP_NAME;              // string
-$env->APP_ENV;               // string
-$env->APP_PORT;              // int
-$env->JWT_PRIVATE_KEY_PATH;  // string
-$env->JWT_PUBLIC_KEY_PATH;   // string
-$env->JWT_EXPIRY;            // int
-$env->ALLOWED_ORIGINS;       // string
-```
-
-### Adding Custom Variables
-
-Edit `src/App/Env.php`:
-
-```php
-class Env extends FrameworkEnv
-{
-    public $STRIPE_API_KEY;
-
-    public function getSchema(): array
-    {
-        $parentSchema = parent::getSchema();
-
-        $appSchema = [
-            'STRIPE_API_KEY' => [
-                'type' => 'string',
-                'required' => true,
-                'default' => null,
-                'description' => 'Stripe API key'
-            ],
-        ];
-
-        return array_merge($parentSchema, $appSchema);
-    }
-}
-```
-
-Then add to `.env`:
-```
-STRIPE_API_KEY=sk_test_your_key_here
-```
-
-## Framework Updates
-
-The core framework lives in `vendor/` and your application code in `src/` stays intact during upgrades.
-
-```bash
-# Update framework to latest version
-composer update progalaxyelabs/stonescriptphp
-```
-
-The upgrade process:
-- ✅ Updates only framework files in `vendor/`
-- ✅ Preserves all your application code in `src/`
-- ✅ Maintains database migrations history
-- ✅ Keeps configuration files unchanged
-
-## Versioning Strategy
-
-This server skeleton follows the framework's versioning:
-
-* **Patch versions (2.0.x)**: Bug fixes, security patches. Safe to update anytime.
-* **Minor versions (2.x.0)**: New features, backward-compatible. Update when you need them.
-* **Major versions (x.0.0)**: Breaking changes. Review migration guide before updating.
-
-The `composer.json` uses `^2.0` to automatically receive framework updates within the same major version.
-
-**Current stable:** v2.0.x - Production-ready with ongoing bug fixes
-
-## Testing Local Framework Changes
-
-To test changes to the framework without publishing to Packagist:
-
-```json
-// In your composer.json, add:
-{
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../StoneScriptPHP",
-            "options": {"symlink": false}
-        }
-    ],
-    "require": {
-        "progalaxyelabs/stonescriptphp": "@dev"
-    }
-}
-```
-
-Then run `composer update progalaxyelabs/stonescriptphp`
-
-## Requirements
-
-### Required
-
-* PHP >= 8.2
-* PostgreSQL >= 13
-* Composer
-* PHP Extensions: `pdo`, `pdo_pgsql`, `json`, `openssl`
-
-### Optional
-
-* Redis server (for caching support)
-* PHP Extension: `redis` (for Redis caching)
-
-## Documentation
-
-### 📖 Getting Started
-
-* **[Getting Started Guide](https://stonescriptphp.org/docs/getting-started)** - Complete tutorial from installation to deployment
-* **[CLI Usage Guide](https://stonescriptphp.org/docs/CLI-USAGE)** - Command reference
-* **[Environment Configuration](https://stonescriptphp.org/docs/environment-configuration)** - Type-safe setup
-
-### 🔧 Core Features
-
-* [API Reference](https://stonescriptphp.org/docs/api-reference) - Complete API documentation
-* [Logging & Exceptions](https://stonescriptphp.org/docs/logging-and-exceptions) - Production-ready logging
-* [Request Validation](https://stonescriptphp.org/docs/validation) - Validation rules
-* [Middleware Guide](https://stonescriptphp.org/docs/MIDDLEWARE) - Custom middleware
-
-### 🔐 Security
-
-* [Authentication](https://stonescriptphp.org/docs/authentication) - JWT and OAuth
-* [RBAC](https://stonescriptphp.org/docs/RBAC) - Role-Based Access Control
-* [Security Best Practices](https://stonescriptphp.org/docs/security-best-practices)
-
-### ⚡ Performance
-
-* [Redis Caching Guide](https://stonescriptphp.org/docs/CACHING) - Cache optimization
-* [Performance Guidelines](https://stonescriptphp.org/docs/performance-guidelines)
-
-## Architecture Philosophy
-
-StoneScriptPHP follows a **PostgreSQL-first architecture**:
-
-1. **Business Logic in Database** - SQL functions encapsulate complex queries
-2. **Type-Safe PHP Models** - Generated classes wrap SQL functions
-3. **Thin Route Layer** - Routes handle HTTP concerns (validation, auth)
-4. **Clean Separation** - Database → Models → Services → Routes
-
-**Benefits:**
-- Leverages PostgreSQL's procedural capabilities
-- Keeps logic close to the data
-- Enables database performance optimization
-- Facilitates testing and maintenance
-
-## Related Packages
-
-* **[stonescriptphp](https://github.com/progalaxyelabs/StoneScriptPHP)** - Core framework library (installed automatically as dependency)
-
-## When to Use the Core Framework Directly
-
-Most developers should use this server skeleton. However, you might want to use the [core framework](https://github.com/progalaxyelabs/StoneScriptPHP) directly if you're:
-
-- Contributing to the framework core
-- Building custom framework extensions
-- Integrating StoneScriptPHP into an existing project
-- Creating your own custom project template
-
-```bash
-# Direct framework installation (advanced usage)
-composer require progalaxyelabs/stonescriptphp
-```
-
-## Support & Community
-
-* **Website**: [stonescriptphp.org](https://stonescriptphp.org)
-* **Full Documentation**: [stonescriptphp.org/docs](https://stonescriptphp.org/docs)
-* **Server Issues**: [GitHub Issues](https://github.com/progalaxyelabs/StoneScriptPHP-Server/issues)
-* **Framework Issues**: [GitHub Issues](https://github.com/progalaxyelabs/StoneScriptPHP/issues)
-* **Discussions**: [GitHub Discussions](https://github.com/progalaxyelabs/StoneScriptPHP/discussions)
-
-## Examples
-
-Check out the `examples/` directory for sample implementations:
-- Basic CRUD operations
-- Authentication flows
-- File uploads
-- Real-time features
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details
 
 ---
 
-**Happy building! 🚀**
+## Contributing
 
-If you have questions or need help, visit [stonescriptphp.org](https://stonescriptphp.org) or open an issue on GitHub.
+This is the application skeleton. For framework contributions, see [StoneScriptPHP](https://github.com/progalaxyelabs/StoneScriptPHP).
+
+---
+
+## License
+
+MIT License - see LICENSE file for details.
+
+---
+
+## Next Steps
+
+- [API Documentation](docs/api.md)
+- [Deployment Guide](docs/deployment.md)
+- [Security Best Practices](docs/security.md)
+- [Framework Documentation](https://github.com/progalaxyelabs/StoneScriptPHP)

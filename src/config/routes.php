@@ -6,8 +6,5 @@ use App\Routes\HomeRoute;
 return [
     'GET' => [
         '/' => HomeRoute::class,
-    ],
-    'POST' => [
-        '/auth/google' => GoogleOauthRoute::class
     ]
 ];
