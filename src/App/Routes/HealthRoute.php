@@ -23,8 +23,7 @@ class HealthRoute implements IRouteHandler
 
         // Check database connection
         try {
-            $db = Database::get_instance();
-            $result = $db->query("SELECT 1");
+            Database::query("SELECT 1");
             $health['checks']['database'] = 'ok';
         } catch (\Exception $e) {
             $health['status'] = 'unhealthy';
