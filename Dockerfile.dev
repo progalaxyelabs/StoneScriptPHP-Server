@@ -1,29 +1,33 @@
-FROM php:8.3-cli-bookworm
+# Development Dockerfile - PHP-FPM + Nginx (Debian-based for easier dev tooling)
+FROM php:8.3-fpm-bookworm
 
-# Install system dependencies
+# Install Nginx, Supervisor, and development dependencies
 RUN apt-get update && apt-get install -y \
+    # Nginx and Supervisor
+    nginx \
+    supervisor \
     # PostgreSQL client and dev libraries
     libpq-dev \
     postgresql-client \
-    # SSL support
-    libssl-dev \
     # Image processing (GD extension)
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
     # ZIP support
     libzip-dev \
-    # Version control and package management
+    # Development tools (make it easy for devs to tinker)
     git \
     unzip \
     curl \
     wget \
-    # Optional: Development tools (comment out for production)
     vim \
     nano \
+    htop \
     net-tools \
     iputils-ping \
     procps \
+    telnet \
+    dnsutils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
@@ -32,40 +36,70 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         gd \
         pdo \
         pdo_pgsql \
-        zip \
-    && pecl install redis \
-    && docker-php-ext-enable redis
+        zip
+
+# Install Redis extension (optional - uncomment if needed)
+# RUN pecl install redis \
+#     && docker-php-ext-enable redis
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
     && composer --version
 
+# Configure PHP for development (verbose errors, debugging enabled)
+RUN { \
+        echo 'display_errors=On'; \
+        echo 'error_reporting=E_ALL'; \
+        echo 'log_errors=On'; \
+        echo 'error_log=/var/log/php_errors.log'; \
+        echo 'max_execution_time=60'; \
+        echo 'memory_limit=512M'; \
+        echo 'post_max_size=50M'; \
+        echo 'upload_max_filesize=50M'; \
+    } > /usr/local/etc/php/conf.d/development.ini
+
+# Configure PHP-FPM (relaxed limits for development)
+RUN echo "pm = dynamic" > /usr/local/etc/php-fpm.d/zz-custom.conf \
+    && echo "pm.max_children = 20" >> /usr/local/etc/php-fpm.d/zz-custom.conf \
+    && echo "pm.start_servers = 2" >> /usr/local/etc/php-fpm.d/zz-custom.conf \
+    && echo "pm.min_spare_servers = 1" >> /usr/local/etc/php-fpm.d/zz-custom.conf \
+    && echo "pm.max_spare_servers = 10" >> /usr/local/etc/php-fpm.d/zz-custom.conf
+
 # Set working directory
 WORKDIR /var/www/html
+
+# Copy Nginx configuration
+COPY docker/nginx.conf /etc/nginx/nginx.conf
+COPY docker/default.conf /etc/nginx/sites-available/default
+
+# Create nginx sites-enabled symlink
+RUN rm -f /etc/nginx/sites-enabled/default \
+    && ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# Copy Supervisor configuration
+COPY docker/supervisord-dev.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copy composer files first (better layer caching)
 COPY composer.json composer.lock* ./
 
-# Install dependencies
+# Install dependencies (development mode with dev packages)
 ENV COMPOSER_ALLOW_SUPERUSER=1
-RUN composer install --no-dev --optimize-autoloader --no-scripts --no-autoloader
+RUN composer install --optimize-autoloader
 
 # Copy application code
 COPY . .
 
-# Regenerate optimized autoloader
-RUN composer dump-autoload --optimize --no-dev
+# Create required directories with proper permissions
+RUN mkdir -p logs \
+    && chown -R www-data:www-data logs \
+    && chmod -R 755 logs
 
-# Create required directories
-RUN mkdir -p logs
-
-# Expose port (default 8000, override with docker run -p)
+# Expose port
 EXPOSE 8000
 
-# Health check (optional - checks if server is responding)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/api/health || exit 1
 
-# Start PHP built-in server
-# Note: Use 0.0.0.0 to allow external connections inside container
-CMD ["php", "-S", "0.0.0.0:8000", "-t", "public"]
+# Start Supervisor (manages Nginx + PHP-FPM)
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

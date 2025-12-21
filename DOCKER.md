@@ -5,24 +5,51 @@ This directory contains **sample Docker configurations** for reference. In produ
 ## Files Overview
 
 ### Development
-- **`Dockerfile.dev`** - Development image using `php -S` built-in server
+- **`Dockerfile.dev`** - Development image using PHP-FPM + Nginx (with hot reload)
 - **`docker-compose.dev.yaml`** - Sample development setup (PostgreSQL + API)
 
 ### Production
-- **`Dockerfile.prod`** - Production image using PHP-FPM + Nginx
+- **`Dockerfile.prod`** - Production image using PHP-FPM + Nginx (optimized)
 - **`docker-compose.prod.yaml`** - Sample production setup
 - **`docker/`** - Nginx and Supervisor configurations
 
 ---
 
+## Important: php stone serve vs Docker
+
+**`php stone serve`** is for **non-Docker local development only**:
+- Uses PHP's built-in server (`php -S`)
+- Quick start without Docker: `php stone serve`
+- ❌ **DO NOT use in Docker containers**
+- ❌ **DO NOT use in production**
+
+**Docker setups (both dev and prod)** use **Nginx + PHP-FPM**:
+- Consistent environment dev → prod
+- Production-grade architecture
+- Better performance and security
+- Avoids compatibility issues
+
+---
+
 ## Development Setup
 
-**⚠️ For development/testing only. DO NOT use in production.**
+**For Docker-based development with hot reload**
 
-The development setup uses PHP's built-in server (`php -S`), which is:
-- ✅ Great for local development
-- ✅ Easy to use and debug
-- ❌ **NOT suitable for production** (single-threaded, not secure, limited features)
+Both development and production Dockerfiles use PHP-FPM + Nginx. The key differences:
+
+**Development (Debian-based):**
+- Base: `php:8.3-fpm-bookworm` (Debian)
+- Tools: vim, nano, htop, git, telnet, dig, etc. (easy tinkering)
+- PHP: Error display ON, verbose errors, 512M memory
+- Size: ~600MB (includes dev tools)
+- Use case: Local testing, debugging, easy to exec into container
+
+**Production (Alpine-based):**
+- Base: `php:8.3-fpm-alpine` (Alpine Linux)
+- Tools: Minimal runtime only
+- PHP: OPcache enabled, errors hidden, optimized autoloader
+- Size: ~50MB (minimal footprint)
+- Use case: Production deployment, optimized performance
 
 ### Quick Start (Development)
 
