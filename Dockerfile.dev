@@ -91,9 +91,9 @@ RUN composer install --optimize-autoloader
 COPY . .
 
 # Create required directories with proper permissions
-RUN mkdir -p logs \
-    && chown -R www-data:www-data logs \
-    && chmod -R 755 logs
+RUN mkdir -p /var/log/stonescriptphp logs \
+    && chown -R www-data:www-data /var/log/stonescriptphp logs \
+    && chmod -R 755 /var/log/stonescriptphp logs
 
 # Expose port
 EXPOSE 8000

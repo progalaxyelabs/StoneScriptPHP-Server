@@ -31,6 +31,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # Docker environment marker
+      DOCKER_CONTAINER: "true"
+
       # Database configuration
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
@@ -75,8 +78,8 @@ services:
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     volumes:
-      # Mount logs only (code is baked into image)
-      - ./logs:/var/www/html/logs
+      # Mount logs in /var/log/stonescriptphp (code is baked into image)
+      - ./logs:/var/log/stonescriptphp
       # Mount keys (JWT keys should be generated and mounted)
       - ./keys:/var/www/html/keys:ro
     healthcheck:

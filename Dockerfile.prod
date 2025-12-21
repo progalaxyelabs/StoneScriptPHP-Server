@@ -114,9 +114,9 @@ COPY docker/default.conf /etc/nginx/http.d/default.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Create required directories
-RUN mkdir -p /var/www/html/logs \
-    && chown -R www-data:www-data /var/www/html/logs \
-    && chmod -R 755 /var/www/html/logs
+RUN mkdir -p /var/log/stonescriptphp \
+    && chown -R www-data:www-data /var/log/stonescriptphp \
+    && chmod -R 755 /var/log/stonescriptphp
 
 # Switch to www-data for runtime
 USER www-data

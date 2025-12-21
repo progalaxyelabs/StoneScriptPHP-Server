@@ -33,6 +33,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # Docker environment marker
+      DOCKER_CONTAINER: "true"
+
       # Database configuration (framework uses DATABASE_* format)
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
@@ -71,10 +74,8 @@ services:
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     volumes:
-      # Mount source code for hot reload during development
+      # Mount source code for hot reload during development (includes logs/)
       - .:/var/www/html
-      # Persist logs
-      - ./logs:/var/www/html/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
