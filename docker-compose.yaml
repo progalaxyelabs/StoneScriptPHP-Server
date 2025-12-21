@@ -35,18 +35,43 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # Database configuration
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_DATABASE: ${DB_DATABASE:-stonescriptphp}
-      DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      # Database configuration (framework uses DATABASE_* format)
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_DBNAME: ${DB_DATABASE:-stonescriptphp}
+      DATABASE_USER: ${DB_USERNAME:-postgres}
+      DATABASE_PASSWORD: ${DB_PASSWORD:-postgres}
+      DATABASE_TIMEOUT: ${DATABASE_TIMEOUT:-30}
+      DATABASE_APPNAME: ${DATABASE_APPNAME:-StoneScriptPHP}
 
       # Application configuration
+      APP_NAME: ${APP_NAME:-StoneScriptPHP}
       APP_ENV: ${APP_ENV:-development}
-      APP_DEBUG: ${APP_DEBUG:-true}
+      APP_PORT: 8000
+      DEBUG_MODE: ${DEBUG_MODE:-true}
+      TIMEZONE: ${TIMEZONE:-UTC}
 
-      # Optional: Redis configuration
+      # JWT configuration
+      JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-./keys/jwt-private.pem}
+      JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-./keys/jwt-public.pem}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRY: ${JWT_EXPIRY:-3600}
+      JWT_ISSUER: ${JWT_ISSUER:-stonescriptphp}
+
+      # CORS
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4200}
+
+      # Optional: OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+
+      # Optional: Email (ZeptoMail)
+      ZEPTOMAIL_BOUNCE_ADDRESS: ${ZEPTOMAIL_BOUNCE_ADDRESS}
+      ZEPTOMAIL_SENDER_EMAIL: ${ZEPTOMAIL_SENDER_EMAIL}
+      ZEPTOMAIL_SENDER_NAME: ${ZEPTOMAIL_SENDER_NAME}
+      ZEPTOMAIL_SEND_MAIL_TOKEN: ${ZEPTOMAIL_SEND_MAIL_TOKEN}
+
+      # Optional: Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:
