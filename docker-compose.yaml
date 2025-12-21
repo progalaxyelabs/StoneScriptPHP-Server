@@ -70,10 +70,6 @@ services:
       ZEPTOMAIL_SENDER_EMAIL: ${ZEPTOMAIL_SENDER_EMAIL}
       ZEPTOMAIL_SENDER_NAME: ${ZEPTOMAIL_SENDER_NAME}
       ZEPTOMAIL_SEND_MAIL_TOKEN: ${ZEPTOMAIL_SEND_MAIL_TOKEN}
-
-      # Optional: Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
     ports:
       - "${APP_PORT:-8000}:8000"
     volumes:
