@@ -20,7 +20,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "2.1.x-dev"
+            "dev-main": "2.2.x-dev"
         }
     },
     "authors": [
@@ -32,7 +32,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "progalaxyelabs/stonescriptphp": "^2.1"
+        "progalaxyelabs/stonescriptphp": "^2.3"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.0"

@@ -16,6 +16,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         gd \
         pdo \
         pdo_pgsql \
+        pgsql \
         zip \
         opcache
 
@@ -63,6 +64,7 @@ RUN apk add --no-cache --virtual .build-deps \
         gd \
         pdo \
         pdo_pgsql \
+        pgsql \
         zip \
         opcache \
     && apk del .build-deps

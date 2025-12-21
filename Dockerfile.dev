@@ -36,6 +36,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
         gd \
         pdo \
         pdo_pgsql \
+        pgsql \
         zip
 
 # Install Redis extension (optional - uncomment if needed)

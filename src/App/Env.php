@@ -9,87 +9,20 @@ use StoneScriptPHP\Env as FrameworkEnv;
  *
  * Extends StoneScriptPHP\Env to add application-specific environment variables.
  * The framework handles core variables (DEBUG_MODE, TIMEZONE, DATABASE_*, etc.)
- * Add your application-specific variables here.
+ * Add your application-specific typed properties here.
  */
 class Env extends FrameworkEnv
 {
-    // Application-specific environment variables
-    public $APP_NAME;
-    public $APP_ENV;
-    public $APP_PORT;
+    // Application-specific environment variables with types and defaults
+    // Note: Parent class already has APP_NAME, APP_ENV, APP_PORT, JWT_*, and ALLOWED_ORIGINS
+    // Only add truly application-specific variables here
 
     // Google OAuth (optional)
-    public $GOOGLE_CLIENT_ID;
+    public ?string $GOOGLE_CLIENT_ID = null;
+    public ?string $GOOGLE_CLIENT_SECRET = null;
 
-    // JWT Configuration
-    public $JWT_PRIVATE_KEY_PATH;
-    public $JWT_PUBLIC_KEY_PATH;
-    public $JWT_EXPIRY;
-
-    // CORS Configuration
-    public $ALLOWED_ORIGINS;
-
-    /**
-     * Override getSchema to merge application-specific variables with framework variables
-     */
-    public function getSchema(): array
-    {
-        // Get parent schema (framework variables)
-        $parentSchema = parent::getSchema();
-
-        // Add application-specific variables
-        $appSchema = [
-            'APP_NAME' => [
-                'type' => 'string',
-                'required' => false,
-                'default' => 'My API',
-                'description' => 'Application name'
-            ],
-            'APP_ENV' => [
-                'type' => 'string',
-                'required' => false,
-                'default' => 'development',
-                'description' => 'Application environment (development, staging, production)'
-            ],
-            'APP_PORT' => [
-                'type' => 'int',
-                'required' => false,
-                'default' => 9100,
-                'description' => 'Default port for development server'
-            ],
-            'GOOGLE_CLIENT_ID' => [
-                'type' => 'string',
-                'required' => false,
-                'default' => null,
-                'description' => 'Google OAuth client ID'
-            ],
-            'JWT_PRIVATE_KEY_PATH' => [
-                'type' => 'string',
-                'required' => false,
-                'default' => './keys/jwt-private.pem',
-                'description' => 'Path to JWT private key'
-            ],
-            'JWT_PUBLIC_KEY_PATH' => [
-                'type' => 'string',
-                'required' => false,
-                'default' => './keys/jwt-public.pem',
-                'description' => 'Path to JWT public key'
-            ],
-            'JWT_EXPIRY' => [
-                'type' => 'int',
-                'required' => false,
-                'default' => 3600,
-                'description' => 'JWT token expiry time in seconds'
-            ],
-            'ALLOWED_ORIGINS' => [
-                'type' => 'string',
-                'required' => false,
-                'default' => 'http://localhost:3000,http://localhost:4200',
-                'description' => 'Comma-separated list of allowed CORS origins'
-            ],
-        ];
-
-        // Merge and return
-        return array_merge($parentSchema, $appSchema);
-    }
+    // Add more application-specific variables as needed
+    // Example:
+    // public ?string $STRIPE_API_KEY = null;
+    // public string $CUSTOM_FEATURE_FLAG = 'enabled';
 }

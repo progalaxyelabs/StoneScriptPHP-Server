@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -11,7 +9,7 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       # Persist database data
       - postgres_data:/var/lib/postgresql/data
@@ -71,7 +69,7 @@ services:
       ZEPTOMAIL_SENDER_NAME: ${ZEPTOMAIL_SENDER_NAME}
       ZEPTOMAIL_SEND_MAIL_TOKEN: ${ZEPTOMAIL_SEND_MAIL_TOKEN}
     ports:
-      - "${APP_PORT:-8000}:8000"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
     volumes:
       # Mount source code for hot reload during development
       - .:/var/www/html
@@ -90,7 +88,7 @@ services:
   #   container_name: stonescriptphp-redis
   #   restart: unless-stopped
   #   ports:
-  #     - "${REDIS_PORT:-6379}:6379"
+  #     - "127.0.0.1:${REDIS_PORT:-6379}:6379"
   #   volumes:
   #     - redis_data:/data
   #   healthcheck:
