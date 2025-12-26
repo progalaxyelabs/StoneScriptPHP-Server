@@ -17,9 +17,9 @@ if (!defined('DEBUG_MODE')) {
 // Load composer autoloader (includes helpers.php and bootstrap.php via autoload.files)
 require_once ROOT_PATH . 'vendor/autoload.php';
 
-// Initialize Env (this will redefine DEBUG_MODE with value from .env)
-use StoneScriptPHP\Env;
-Env::get_instance();
+// Initialize application Env (separate from framework's Env created in bootstrap.php)
+use App\AppEnv;
+$env = AppEnv::get_instance();
 
 enum RequestMethod : string {
     case get = 'GET';
