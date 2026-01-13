@@ -74,39 +74,28 @@ The StoneScriptPHP Server serves as:
 StoneScriptPHP-Server/
 ├── src/
 │   ├── App/
-│   │   ├── Config/
-│   │   │   ├── routes.php              # URL-to-route mapping
-│   │   │   ├── allowed-origins.php     # CORS configuration
-│   │   │   └── google-oauth.php        # OAuth configuration
 │   │   ├── Routes/
 │   │   │   ├── HomeRoute.php           # Example GET route
-│   │   │   ├── GoogleOauthRoute.php    # Example OAuth route
+│   │   │   ├── HealthRoute.php         # Health check route
 │   │   │   └── [Generated Routes]      # Auto-generated routes
-│   │   ├── Services/                   # Business logic layer
-│   │   ├── Models/
-│   │   │   ├── Permission.php          # Auth models
-│   │   │   ├── Role.php
-│   │   │   ├── User.php
-│   │   │   ├── MyTokenClaims.php
-│   │   │   └── [Generated Models]      # Generated from SQL functions
-│   │   ├── Database/
-│   │   │   ├── Functions/              # Auto-generated PHP models
-│   │   │   └── postgres/
-│   │   │       ├── tables/             # Table schemas (.pssql)
-│   │   │       ├── functions/          # SQL functions (.pssql)
-│   │   │       └── seeds/              # Seed data
-│   │   ├── Lib/
-│   │   │   └── MyZeptoMail.php         # Email library integration
-│   │   └── Env.php                     # Application configuration
-│   └── config/
-│       └── [Framework config]
+│   │   ├── DTO/                        # Data Transfer Objects
+│   │   ├── Lib/                        # Custom libraries
+│   │   └── AppEnv.php                  # Application environment configuration
+│   ├── config/
+│   │   ├── routes.php                  # URL-to-route mapping
+│   │   └── allowed-origins.php         # CORS configuration
+│   └── postgresql/
+│       ├── tables/                     # Table schemas (.sql)
+│       └── functions/                  # SQL functions (.sql)
+├── migrations/                         # Database migrations (generated)
 ├── vendor/
 │   └── progalaxyelabs/stonescriptphp/  # Framework + CLI tools
 ├── tests/                              # PHPUnit tests
 ├── public/
 │   └── index.php                       # Application entry point
 ├── docker-compose.yml                  # Docker development environment
-├── Dockerfile                          # Container image definition
+├── Dockerfile.dev                      # Development container
+├── Dockerfile.prod                     # Production container
 ├── composer.json                       # Project dependencies
 ├── stone                               # CLI entry point
 ├── .env                                # Environment configuration
@@ -202,10 +191,10 @@ docker compose up -d
 
 #### Step 1: Define Database Schema
 
-Create table definitions in `src/App/Database/postgres/tables/`:
+Create table definitions in `src/postgresql/tables/`:
 
 ```sql
--- src/App/Database/postgres/tables/users_table.pssql
+-- src/postgresql/tables/users_table.pssql
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
@@ -222,10 +211,10 @@ CREATE INDEX idx_users_role ON users(role_id);
 
 #### Step 2: Create SQL Functions
 
-Define business logic as PostgreSQL functions in `src/App/Database/postgres/functions/`:
+Define business logic as PostgreSQL functions in `src/postgresql/functions/`:
 
 ```sql
--- src/App/Database/postgres/functions/get_users_by_role.pgsql
+-- src/postgresql/functions/get_users_by_role.pgsql
 CREATE OR REPLACE FUNCTION get_users_by_role(p_role_id INTEGER)
 RETURNS TABLE (
     id INTEGER,
@@ -250,7 +239,7 @@ $$ LANGUAGE plpgsql;
 php stone generate model get_users_by_role.pgsql
 ```
 
-This creates `src/App/Database/Functions/FnGetUsersByRole.php`:
+This creates `src/App/Models/FnGetUsersByRole.php`:
 
 ```php
 class FnGetUsersByRole
@@ -306,7 +295,7 @@ class GetUsersByRoleRoute implements IRouteHandler
 
 #### Step 6: Register Route
 
-Map URL to route in `src/App/Config/routes.php`:
+Map URL to route in `src/config/routes.php`:
 
 ```php
 return [
@@ -374,7 +363,7 @@ php stone generate auth:apple
 
 ### Environment Configuration
 
-Type-safe environment configuration via `src/App/Env.php`:
+Type-safe environment configuration via `src/App/AppEnv.php`:
 
 ```php
 $env = Env::get_instance();
@@ -564,7 +553,7 @@ Response:
 
 ### CORS Configuration
 
-Configure allowed origins in `src/App/Config/allowed-origins.php`:
+Configure allowed origins in `src/config/allowed-origins.php`:
 
 ```php
 return [
@@ -585,7 +574,7 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:4200,https://example.com
 |-----------|-----------|---------|
 | Language | PHP | >= 8.2 |
 | Database | PostgreSQL | >= 13 |
-| Framework | StoneScriptPHP | ^2.1 |
+| Framework | StoneScriptPHP | ^2.3.6 |
 | Authentication | JWT (RSA) | OpenSSL |
 | OAuth | Google, LinkedIn, Apple | - |
 | Caching | Redis | Optional |

@@ -261,12 +261,15 @@ my-api/
 ├── src/
 │   ├── App/
 │   │   ├── Routes/         # Route handlers
-│   │   │   └── Auth/       # Auth routes (generated)
-│   │   ├── Models/         # Domain models (generated)
-│   │   └── Config/         # Configuration
-│   │       └── routes.php  # Route definitions
-│   └── config/
-│       └── allowed-origins.php  # CORS config
+│   │   ├── DTO/            # Data Transfer Objects
+│   │   ├── Lib/            # Custom libraries
+│   │   └── AppEnv.php      # Application environment config
+│   ├── config/
+│   │   ├── routes.php      # Route definitions
+│   │   └── allowed-origins.php  # CORS config
+│   └── postgresql/
+│       ├── tables/         # Table schemas
+│       └── functions/      # SQL functions
 ├── composer.json
 ├── docker-compose.yaml
 └── .env
@@ -288,7 +291,7 @@ MIT License - see LICENSE file for details.
 
 ## Next Steps
 
-- [API Documentation](docs/api.md)
-- [Deployment Guide](docs/deployment.md)
-- [Security Best Practices](docs/security.md)
 - [Framework Documentation](https://github.com/progalaxyelabs/StoneScriptPHP)
+- [Docker Deployment Guide](DOCKER.md)
+- [High Level Design](HLD.md)
+- [Website](https://stonescriptphp.org)
