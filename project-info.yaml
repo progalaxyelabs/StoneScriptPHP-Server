@@ -2,6 +2,8 @@
 # StoneScriptPHP Server - Application Skeleton & Reference Implementation
 # Location: /ssd2/projects/progalaxy-elabs/opensource/stonescriptphp/StoneScriptPHP-Server/
 
+project_code: SSPS-001
+
 project:
   name: StoneScriptPHP Server
   version: 2.1.x
