@@ -1,14 +1,15 @@
 # Production Dockerfile - PHP-FPM + Nginx
 # Build stage for Composer dependencies
-FROM php:8.3-fpm-alpine AS builder
+FROM php:8.3-fpm-bookworm AS builder
 
 # Install build dependencies
-RUN apk add --no-cache \
-    postgresql-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
     libzip-dev \
     libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -39,26 +40,27 @@ COPY . .
 RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
 
 # Production stage
-FROM php:8.3-fpm-alpine
+FROM php:8.3-fpm-bookworm
 
 # Install runtime dependencies
-RUN apk add --no-cache \
-    postgresql-libs \
-    libzip \
-    libpng \
-    libjpeg-turbo \
-    freetype \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    libzip4 \
+    libpng16-16 \
+    libjpeg62-turbo \
+    libfreetype6 \
     nginx \
     supervisor \
-    curl
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN apk add --no-cache --virtual .build-deps \
-        postgresql-dev \
+# Install PHP extensions (build deps temporarily)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq-dev \
         libzip-dev \
         libpng-dev \
-        libjpeg-turbo-dev \
-        freetype-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         gd \
@@ -67,7 +69,13 @@ RUN apk add --no-cache --virtual .build-deps \
         pgsql \
         zip \
         opcache \
-    && apk del .build-deps
+    && apt-get purge -y --auto-remove \
+        libpq-dev \
+        libzip-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Redis extension (optional - only if needed)
 # RUN apk add --no-cache --virtual .redis-build autoconf g++ make \
