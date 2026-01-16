@@ -60,6 +60,11 @@ php stone migrate up
 ### 4. Start Development
 
 ```bash
+# Start Docker-based development server (recommended)
+composer dev
+# API running at http://localhost:8000
+
+# Or use framework's built-in server
 php stone serve
 # API running at http://localhost:9100
 ```
@@ -82,6 +87,61 @@ php stone serve
 - ❌ No seeders
 
 **Philosophy:** Start minimal, add incrementally via CLI commands.
+
+---
+
+## Docker Development
+
+StoneScriptPHP-Server provides a Docker-first development experience with Nginx + PHP-FPM.
+
+### Development Commands
+
+```bash
+# Start development server (builds image if needed, runs detached)
+composer dev
+# or
+composer serve
+
+# Stop development server
+composer stop
+
+# Restart server
+composer restart
+
+# View application logs (follow mode)
+composer logs
+
+# Access container shell
+composer shell
+
+# Rebuild image (after Dockerfile changes)
+composer build
+
+# Clean up (removes container and image)
+composer clean
+```
+
+### What's Included
+
+- **Nginx** - Production-grade web server with proper URL rewriting
+- **PHP-FPM** - High-performance PHP processor
+- **Supervisor** - Process manager for Nginx + PHP-FPM
+- **Development tools** - git, vim, curl, postgres client, etc.
+
+### Live Reload
+
+Your code is mounted as a volume - changes are reflected immediately without rebuilding.
+
+### Database Connection
+
+Connect to your external PostgreSQL instance via `.env`:
+```env
+DB_HOST=localhost      # or your database host
+DB_PORT=5432
+DB_NAME=stonescriptphp
+DB_USER=postgres
+DB_PASSWORD=postgres
+```
 
 ---
 

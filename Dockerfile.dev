@@ -81,11 +81,11 @@ RUN rm -f /etc/nginx/sites-enabled/default \
 COPY docker/supervisord-dev.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copy composer files first (better layer caching)
-COPY composer.json composer.lock* ./
+COPY composer.json composer.lock ./
 
 # Install dependencies (development mode with dev packages)
 ENV COMPOSER_ALLOW_SUPERUSER=1
-RUN composer install --optimize-autoloader
+RUN composer install --no-interaction --optimize-autoloader
 
 # Copy application code
 COPY . .

@@ -13,7 +13,7 @@
 # Dependencies
 /vendor/
 /node_modules/
-composer.lock
+# composer.lock is committed for reproducible builds (this is a project, not a library)
 
 # IDE & Editors
 /.idea/

@@ -20,7 +20,7 @@
     },
     "extra": {
         "branch-alias": {
-            "dev-main": "2.2.x-dev"
+            "dev-main": "2.3.x-dev"
         }
     },
     "authors": [
@@ -58,9 +58,41 @@
         "post-create-project-cmd": [
             "@php stone setup"
         ],
+        "dev": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php -r \"passthru('docker build -t stonescriptphp-dev -f Dockerfile.dev . 2>&1 | grep -q \\\"Successfully built\\\" || docker build -t stonescriptphp-dev -f Dockerfile.dev .');\"",
+            "@php -r \"passthru('docker run -d --name stonescriptphp-dev -p 8000:8000 -v \\\"' . getcwd() . ':/var/www/html\\\" --env-file .env stonescriptphp-dev 2>&1');\"",
+            "@php -r \"echo '\\n\\033[0;32m✓ Development server started!\\033[0m\\n';\"",
+            "@php -r \"echo '  Access at: http://localhost:8000\\n';\"",
+            "@php -r \"echo '  Stop: composer stop\\n';\"",
+            "@php -r \"echo '  Logs: composer logs\\n\\n';\""
+        ],
         "serve": [
+            "@dev"
+        ],
+        "stop": [
+            "@php -r \"passthru('docker stop stonescriptphp-dev 2>&1');\"",
+            "@php -r \"passthru('docker rm stonescriptphp-dev 2>&1');\"",
+            "@php -r \"echo '\\n\\033[0;32m✓ Development server stopped\\033[0m\\n\\n';\""
+        ],
+        "restart": [
+            "@stop",
+            "@dev"
+        ],
+        "logs": [
             "Composer\\Config::disableProcessTimeout",
-            "php stone serve"
+            "docker logs -f stonescriptphp-dev"
+        ],
+        "shell": [
+            "docker exec -it stonescriptphp-dev /bin/bash"
+        ],
+        "build": [
+            "docker build -t stonescriptphp-dev -f Dockerfile.dev --no-cache ."
+        ],
+        "clean": [
+            "@stop",
+            "@php -r \"passthru('docker rmi stonescriptphp-dev 2>&1');\"",
+            "@php -r \"echo '\\n\\033[0;33m⚠ Container and image removed\\033[0m\\n\\n';\""
         ],
         "test": "phpunit",
         "migrate": "php stone migrate"
