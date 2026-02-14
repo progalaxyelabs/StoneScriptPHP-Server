@@ -89,7 +89,7 @@ test-docker-env/
 - Image: PostgreSQL 16 Alpine
 - Port: 5433 (to avoid conflicts)
 - Database: stonescriptphp_test
-- Credentials: postgres/testpassword123
+- Credentials: postgres/postgres
 
 ## What Success Looks Like
 

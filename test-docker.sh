@@ -186,7 +186,7 @@ services:
     environment:
       POSTGRES_DB: stonescriptphp_test
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: testpassword123
+      POSTGRES_PASSWORD: postgres
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
@@ -215,7 +215,7 @@ services:
       DATABASE_PORT: 5432
       DATABASE_DBNAME: stonescriptphp_test
       DATABASE_USER: postgres
-      DATABASE_PASSWORD: testpassword123
+      DATABASE_PASSWORD: postgres
       DATABASE_TIMEOUT: 30
       DATABASE_APPNAME: StoneScriptPHP-Test
 
@@ -229,7 +229,7 @@ services:
       # JWT configuration (dummy values for testing)
       JWT_PRIVATE_KEY_PATH: ./keys/jwt-private.pem
       JWT_PUBLIC_KEY_PATH: ./keys/jwt-public.pem
-      JWT_SECRET: test-secret-key-for-docker-testing
+      JWT_SECRET: change-me-in-production
       JWT_EXPIRY: 3600
       JWT_ISSUER: stonescriptphp-test
 
