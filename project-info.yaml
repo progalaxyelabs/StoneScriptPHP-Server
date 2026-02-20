@@ -279,7 +279,7 @@ docker:
         - .:/var/www/html
         - ./logs:/var/www/html/logs
       healthcheck:
-        endpoint: http://localhost:8000/api/health
+        endpoint: http://localhost:8000/health
 
   development:
     command: docker compose up -d
