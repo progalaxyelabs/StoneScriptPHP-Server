@@ -1,0 +1,39 @@
+# StoneScriptPHP CLI - Lightweight schema migration image
+# Build: docker build -t stonescriptphp-cli:v3 -f Dockerfile.cli .
+# Usage: docker run --rm -v ./src/postgresql:/app/src/postgresql \
+#          -e DB_GATEWAY_URL=... -e PLATFORM_ID=... -e SCHEMA_NAME=... -e ADMIN_TOKEN=... \
+#          stonescriptphp-cli:v3 php stone gateway:register-main
+#
+# Rebuild when StoneScriptPHP framework is updated.
+
+FROM php:8.3-cli-alpine
+
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+RUN apk add --no-cache tar curl
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+WORKDIR /app
+
+# Minimal composer.json requiring only the framework + gateway client
+COPY <<'EOF' composer.json
+{
+    "require": {
+        "php": "^8.3",
+        "progalaxyelabs/stonescriptphp": "^3.0",
+        "progalaxyelabs/stonescriptdb-gateway-client": "^2.0"
+    }
+}
+EOF
+
+RUN composer install --no-dev --optimize-autoloader \
+    && composer clear-cache
+
+# Copy stone CLI from installed framework
+RUN cp vendor/progalaxyelabs/stonescriptphp/stone stone && chmod 755 stone
+
+# Verify
+RUN php stone help | head -3
+
+CMD ["php", "stone", "help"]
