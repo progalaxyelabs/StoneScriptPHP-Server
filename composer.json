@@ -18,11 +18,6 @@
         "source": "https://github.com/progalaxyelabs/StoneScriptPHP-Server",
         "docs": "https://stonescriptphp.org/docs"
     },
-    "extra": {
-        "branch-alias": {
-            "dev-main": "2.3.x-dev"
-        }
-    },
     "authors": [
         {
             "name": "StoneScriptPHP Team",
@@ -32,7 +27,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "progalaxyelabs/stonescriptphp": "^2.3.6"
+        "progalaxyelabs/stonescriptphp": "^3.0"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.0"
@@ -61,7 +56,7 @@
         "dev": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php -r \"passthru('docker build -t stonescriptphp-dev -f Dockerfile.dev . 2>&1 | grep -q \\\"Successfully built\\\" || docker build -t stonescriptphp-dev -f Dockerfile.dev .');\"",
-            "@php -r \"passthru('docker run -d --name stonescriptphp-dev -p 8000:8000 -v \\\"' . getcwd() . ':/var/www/html\\\" --env-file .env stonescriptphp-dev 2>&1');\"",
+            "@php -r \"passthru('docker run -d --name stonescriptphp-dev -p 8000:8000 -v \\\"' . getcwd() . ':/app\\\" --env-file .env stonescriptphp-dev 2>&1');\"",
             "@php -r \"echo '\\n\\033[0;32m✓ Development server started!\\033[0m\\n';\"",
             "@php -r \"echo '  Access at: http://localhost:8000\\n';\"",
             "@php -r \"echo '  Stop: composer stop\\n';\"",
