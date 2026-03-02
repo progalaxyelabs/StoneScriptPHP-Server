@@ -8,42 +8,34 @@
  */
 
 // Detect installation mode and set up paths
-$isVendorMode = strpos(__DIR__, 'vendor/progalaxyelabs/stonescriptphp') !== false;
-
-if ($isVendorMode) {
-    // Running from vendor/progalaxyelabs/stonescriptphp/stone
-    // This happens when framework is installed via Composer in a project
-    $vendorDir = dirname(dirname(__DIR__)); // vendor/
-    $projectRoot = dirname($vendorDir);      // project root
-    define('ROOT_PATH', $projectRoot . DIRECTORY_SEPARATOR);
-    define('IS_VENDOR_MODE', true);
+if (strpos(__DIR__, 'vendor/progalaxyelabs/stonescriptphp') !== false) {
+    // Running directly from vendor/progalaxyelabs/stonescriptphp/stone
+    $frameworkDir = __DIR__;
+    $projectRoot = dirname(__DIR__, 3);
+    $isVendorMode = true;
+} elseif (is_dir(__DIR__ . '/vendor/progalaxyelabs/stonescriptphp')) {
+    // stone was copied to project root by composer post-install
+    $frameworkDir = __DIR__ . '/vendor/progalaxyelabs/stonescriptphp';
+    $projectRoot = __DIR__;
+    $isVendorMode = true;
 } else {
     // Running from framework development repository
-    // This happens when working on the framework itself
-    define('ROOT_PATH', __DIR__ . DIRECTORY_SEPARATOR);
-    define('IS_VENDOR_MODE', false);
+    $frameworkDir = __DIR__;
+    $projectRoot = __DIR__;
+    $isVendorMode = false;
 }
+
+define('ROOT_PATH', $projectRoot . DIRECTORY_SEPARATOR);
+define('IS_VENDOR_MODE', $isVendorMode);
 
 // Define project paths
 // SRC_PATH points to the project's src/ directory (where App\ namespace lives)
 define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
 define('CONFIG_PATH', SRC_PATH . 'App' . DIRECTORY_SEPARATOR . 'Config' . DIRECTORY_SEPARATOR);
 
-require_once ($isVendorMode ? $vendorDir : ROOT_PATH) . 'vendor/autoload.php';
+require_once $projectRoot . '/vendor/autoload.php';
 
-// CLI Colors
-class Color {
-    const RED = "\033[0;31m";
-    const GREEN = "\033[0;32m";
-    const YELLOW = "\033[1;33m";
-    const BLUE = "\033[0;34m";
-    const NC = "\033[0m"; // No Color
-
-    public static function red($text) { return self::RED . $text . self::NC; }
-    public static function green($text) { return self::GREEN . $text . self::NC; }
-    public static function yellow($text) { return self::YELLOW . $text . self::NC; }
-    public static function blue($text) { return self::BLUE . $text . self::NC; }
-}
+require_once $frameworkDir . '/cli/helpers/color.php';
 
 // Available commands
 $commands = [
@@ -58,14 +50,6 @@ $commands = [
     'setup' => [
         'description' => 'Interactive project setup (run after composer create-project). Use --quiet to skip prompts',
         'file' => 'cli/setup.php',
-    ],
-    'serve' => [
-        'description' => 'Start development server',
-        'handler' => 'serve',
-    ],
-    'stop' => [
-        'description' => 'Stop development server',
-        'handler' => 'stop',
     ],
     'generate' => [
         'description' => 'Generate code (route, model, migration, etc.)',
@@ -103,13 +87,21 @@ $commands = [
         'description' => 'Export postgresql folder as tar.gz for db-gateway',
         'file' => 'cli/schema-export.php',
     ],
-    'gateway:register' => [
-        'description' => 'Register platform with db-gateway on container startup',
-        'file' => 'cli/gateway-register.php',
+    'gateway:register-main' => [
+        'description' => 'Register platform and create main database via gateway',
+        'file' => 'cli/gateway-register-main.php',
     ],
-    'gateway:migrate' => [
-        'description' => 'Hot migrate schema to running db-gateway',
-        'file' => 'cli/gateway-migrate.php',
+    'gateway:register-tenant' => [
+        'description' => 'Register platform and upload tenant schema to gateway',
+        'file' => 'cli/gateway-register-tenant.php',
+    ],
+    'gateway:migrate-main' => [
+        'description' => 'Migrate main database schema via gateway',
+        'file' => 'cli/gateway-migrate-main.php',
+    ],
+    'gateway:migrate-tenant' => [
+        'description' => 'Migrate tenant database schema via gateway',
+        'file' => 'cli/gateway-migrate-tenant.php',
     ],
 ];
 
@@ -135,6 +127,8 @@ if ($command === 'generate' && !empty($args)) {
         $commands['generate']['file'] = 'cli/generate-model.php';
     } elseif ($subCommand === 'client') {
         $commands['generate']['file'] = 'cli/generate-client.php';
+    } elseif ($subCommand === 'contract') {
+        $commands['generate']['file'] = 'cli/generate-contract.php';
     } elseif ($subCommand === 'env') {
         $commands['generate']['file'] = 'cli/generate-env.php';
     } elseif ($subCommand === 'jwt') {
@@ -154,17 +148,20 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "Examples:\n";
     echo "  php stone new my-api                    # Create new project\n";
     echo "  php stone setup                         # Interactive setup\n";
-    echo "  php stone serve                         # Start dev server\n";
     echo "  php stone generate route login          # Generate login route\n";
     echo "  php stone generate model get_user.pgsql # Generate model from PostgreSQL function\n";
+    echo "  php stone generate contract             # Generate contracts from routes\n";
+    echo "  php stone generate client               # Generate TypeScript client\n";
     echo "  php stone generate auth:google          # Generate Google OAuth\n";
     echo "  php stone generate cache:redis          # Generate Redis caching\n";
     echo "  php stone generate jwt                  # Generate JWT RSA keys\n";
     echo "  php stone migrate verify                # Check database drift\n";
     echo "  php stone tenant:create \"Acme\" acme    # Create new tenant\n";
     echo "  php stone tenant:list                   # List all tenants\n";
-    echo "  php stone gateway:register              # Register with db-gateway\n";
-    echo "  php stone gateway:migrate               # Hot migrate to db-gateway\n";
+    echo "  php stone gateway:register-main          # Register platform + create main DB\n";
+    echo "  php stone gateway:register-tenant        # Register platform + upload tenant schema\n";
+    echo "  php stone gateway:migrate-main           # Migrate main database schema\n";
+    echo "  php stone gateway:migrate-tenant          # Migrate all tenant database schemas\n";
     echo "\n";
     echo "Run 'php stone <command> --help' for detailed help on any command.\n";
     echo "\n";
@@ -183,73 +180,6 @@ $cmdInfo = $commands[$command];
 // Handle built-in commands
 if (isset($cmdInfo['handler'])) {
     switch ($cmdInfo['handler']) {
-        case 'serve':
-            $port = $args[0] ?? 9100;
-            $pidFile = ROOT_PATH . "/.stone-server-$port.pid";
-
-            // Check if server is already running on this port
-            if (file_exists($pidFile)) {
-                $pid = (int) trim(file_get_contents($pidFile));
-                if (posix_kill($pid, 0)) {
-                    echo Color::yellow("Server is already running on port $port (PID $pid)") . "\n";
-                    echo "Run 'php stone stop $port' to stop it first\n";
-                    exit(1);
-                }
-            }
-
-            echo Color::green("Starting server on http://127.0.0.1:$port") . "\n";
-            echo "Run 'php stone stop $port' to stop the server\n\n";
-
-            // Start server in background and save PID and port
-            $command = sprintf('php -S 127.0.0.1:%d -t public > /dev/null 2>&1 & echo $!', $port);
-            $pid = (int) trim(shell_exec($command));
-            file_put_contents($pidFile, "$pid\n$port");
-
-            echo Color::green("Server started with PID $pid on port $port") . "\n";
-            break;
-
-        case 'stop':
-            $port = $args[0] ?? 9100;
-            $pidFile = ROOT_PATH . "/.stone-server-$port.pid";
-
-            if (!file_exists($pidFile)) {
-                echo Color::yellow("No server is running on port $port") . "\n";
-                exit(0);
-            }
-
-            $data = trim(file_get_contents($pidFile));
-            list($pid, $savedPort) = explode("\n", $data);
-            $pid = (int) $pid;
-
-            // Check if process is actually running
-            if (!posix_kill($pid, 0)) {
-                echo Color::yellow("Server process (PID $pid) is not running") . "\n";
-                unlink($pidFile);
-                exit(0);
-            }
-
-            // Verify it's a PHP server process on the correct port
-            $cmdline = file_get_contents("/proc/$pid/cmdline");
-            if (strpos($cmdline, "php") === false || strpos($cmdline, "$port") === false) {
-                echo Color::yellow("PID $pid doesn't match expected server on port $port") . "\n";
-                unlink($pidFile);
-                exit(1);
-            }
-
-            // Kill the process
-            posix_kill($pid, SIGTERM);
-
-            // Wait a bit and check if it stopped
-            usleep(500000); // 0.5 seconds
-            if (posix_kill($pid, 0)) {
-                // Still running, force kill
-                posix_kill($pid, SIGKILL);
-            }
-
-            unlink($pidFile);
-            echo Color::green("Server stopped (PID $pid on port $port)") . "\n";
-            break;
-
         case 'test':
             if (!file_exists('vendor/bin/phpunit')) {
                 echo Color::red("PHPUnit not installed. Run: composer require --dev phpunit/phpunit") . "\n";
@@ -263,8 +193,8 @@ if (isset($cmdInfo['handler'])) {
 
 // Execute external CLI script
 if (isset($cmdInfo['file'])) {
-    // CLI tools are in the framework package (vendor/)
-    $scriptPath = ROOT_PATH . 'vendor/progalaxyelabs/stonescriptphp/' . $cmdInfo['file'];
+    // CLI tools are in the framework package directory
+    $scriptPath = $frameworkDir . '/' . $cmdInfo['file'];
 
     if (!file_exists($scriptPath)) {
         echo Color::red("Error: CLI script not found") . "\n\n";
