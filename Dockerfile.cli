@@ -1,7 +1,7 @@
 # StoneScriptPHP CLI - Lightweight schema migration image
 # Build: docker build -t stonescriptphp-cli:v3 -f Dockerfile.cli .
 # Usage: docker run --rm -v ./src/postgresql:/app/src/postgresql \
-#          -e DB_GATEWAY_URL=... -e PLATFORM_ID=... -e SCHEMA_NAME=... -e ADMIN_TOKEN=... \
+#          -e DB_GATEWAY_URL=... -e PLATFORM_ID=... -e SCHEMA_NAME=... -e DB_GATEWAY_ADMIN_TOKEN=... \
 #          stonescriptphp-cli:v3 php stone gateway:register-main
 #
 # Rebuild when StoneScriptPHP framework is updated.

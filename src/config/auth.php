@@ -13,7 +13,7 @@ return [
     // Platform identity — sent in every request to the auth service
     'platform' => [
         'code'   => 'myapp',    // Required: matches PLATFORM_CODE in auth service
-        'secret' => null,       // X-Platform-Secret for privileged endpoints (register-tenant)
+        'secret' => null,       // Falls back to EXTERNAL_AUTH_CLIENT_SECRET env var. Used as X-Platform-Secret header for privileged endpoints (register-tenant)
     ],
 
     'server' => [
