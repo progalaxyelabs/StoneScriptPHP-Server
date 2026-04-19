@@ -234,6 +234,92 @@ curl -X POST http://localhost:9100/auth/login \
 
 ---
 
+## Token Exchange (External Auth Mode)
+
+When using external authentication (mode: 'external' in `config/auth.php`), your API validates JWTs from a central auth service but may need to issue **platform tokens** with additional claims like roles.
+
+### Flow
+
+```
+1. User authenticates with external auth service → receives identity token
+2. Client calls POST /api/auth/exchange with identity token
+3. API validates token against auth service JWKS
+4. API looks up user roles from tenant database
+5. API signs and returns platform token with roles
+```
+
+### Setup
+
+**1. Generate platform signing keys:**
+```bash
+openssl genrsa -out keys/platform-private.pem 2048
+openssl rsa -in keys/platform-private.pem -pubout -out keys/platform-public.pem
+```
+
+**2. Configure `config/auth.php`:**
+```php
+return [
+    'mode' => 'external',
+    'server' => [
+        'url' => 'http://auth-service:3139',  // Auth service URL
+        'issuer' => 'https://auth.example.com', // JWT issuer claim
+        'paths' => [
+            'jwks' => '/api/auth/jwks',
+        ],
+    ],
+    'platform_jwt' => [
+        'private_key_path' => __DIR__ . '/../../keys/platform-private.pem',
+        'public_key_path' => __DIR__ . '/../../keys/platform-public.pem',
+        'algorithm' => 'RS256',
+        'key_id' => 'platform-key-1',
+        'ttl' => 3600,
+    ],
+];
+```
+
+**3. Customize role lookup in `TokenExchangeRoute.php`:**
+
+The skeleton uses `Database::fn('get_user_role', [$identityId])`. Replace this with your tenant DB schema:
+
+```php
+// Option A: user_roles junction table
+$roleResult = Database::fn('get_user_roles_by_identity', [$identityId]);
+
+// Option B: Single role column
+$roleResult = Database::fn('get_user_by_identity', [$identityId]);
+$role = $roleResult[0]['role'] ?? 'member';
+```
+
+### Usage
+
+```bash
+# Exchange identity token for platform token
+curl -X POST http://localhost:9100/api/auth/exchange \
+  -H "Authorization: Bearer <identity-token>"
+
+# Response
+{
+  "status": "ok",
+  "data": {
+    "access_token": "<platform-token>",
+    "token_type": "Bearer",
+    "expires_in": 3600,
+    "role": "admin",
+    "roles": ["admin", "member"]
+  }
+}
+```
+
+### Platform Token Claims
+
+The issued platform token includes:
+- `identity_id`, `tenant_id`, `tenant_slug` - from identity token
+- `role`, `roles` - from tenant database lookup
+- `token_type: "platform"` - distinguishes from identity tokens
+- Standard JWT claims (`iat`, `exp`, `iss`, `sub`)
+
+---
+
 ## Migrations
 
 Migrations are stored in `migrations/` and run in order:

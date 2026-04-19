@@ -2,6 +2,7 @@
 
 use App\Routes\HealthRoute;
 use App\Routes\HomeRoute;
+use App\Routes\Auth\TokenExchangeRoute;
 
 return [
     // Public routes: no JWT required
@@ -11,7 +12,9 @@ return [
             '/health' => HealthRoute::class,
         ],
         'POST' => [
-            // Add your public POST routes here
+            // Token exchange: accepts identity token, returns platform token
+            // The route validates the incoming identity JWT itself
+            '/api/auth/exchange' => TokenExchangeRoute::class,
         ],
     ],
 

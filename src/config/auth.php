@@ -89,4 +89,31 @@ return [
         'after_password_reset' => null,
         'after_accept_invite'  => null,
     ],
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Platform JWT Configuration (for token exchange flow)
+    // ─────────────────────────────────────────────────────────────────────────────
+    //
+    // Used by POST /api/auth/exchange to issue platform tokens with roles.
+    //
+    // Generate keys:
+    //   openssl genrsa -out keys/platform-private.pem 2048
+    //   openssl rsa -in keys/platform-private.pem -pubout -out keys/platform-public.pem
+    //
+    'platform_jwt' => [
+        // Path to RSA private key (for signing platform tokens)
+        'private_key_path' => __DIR__ . '/../../keys/platform-private.pem',
+
+        // Path to RSA public key (for JWKS endpoint, optional)
+        'public_key_path' => __DIR__ . '/../../keys/platform-public.pem',
+
+        // JWT algorithm (RS256, RS384, RS512, ES256, ES384, ES512)
+        'algorithm' => 'RS256',
+
+        // Key ID for JWKS matching (should be unique, rotate when key changes)
+        'key_id' => 'platform-key-1',
+
+        // Token TTL in seconds (default: 1 hour)
+        'ttl' => 3600,
+    ],
 ];
