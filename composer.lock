@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7c237e266e391fbc23708b77b8b2d41a",
+    "content-hash": "c7d44ffb265006cfc45ae373a68a47e0",
     "packages": [
         {
             "name": "firebase/php-jwt",
@@ -264,16 +264,16 @@
         },
         {
             "name": "progalaxyelabs/stonescriptphp",
-            "version": "v3.18.1",
+            "version": "v3.20.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/progalaxyelabs/StoneScriptPHP.git",
-                "reference": "8fc553d103d0f8a846781a842d9653fec1aed02f"
+                "reference": "49d84b1e96e447ebd6673c04b076231d345a9abd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/progalaxyelabs/StoneScriptPHP/zipball/8fc553d103d0f8a846781a842d9653fec1aed02f",
-                "reference": "8fc553d103d0f8a846781a842d9653fec1aed02f",
+                "url": "https://api.github.com/repos/progalaxyelabs/StoneScriptPHP/zipball/49d84b1e96e447ebd6673c04b076231d345a9abd",
+                "reference": "49d84b1e96e447ebd6673c04b076231d345a9abd",
                 "shasum": ""
             },
             "require": {
@@ -330,7 +330,7 @@
                 "issues": "https://github.com/progalaxyelabs/StoneScriptPHP/issues",
                 "source": "https://github.com/progalaxyelabs/StoneScriptPHP"
             },
-            "time": "2026-04-20T05:48:00+00:00"
+            "time": "2026-04-20T09:30:01+00:00"
         },
         {
             "name": "symfony/polyfill-ctype",
