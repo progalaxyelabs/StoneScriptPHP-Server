@@ -2,7 +2,7 @@
     "name": "progalaxyelabs/stonescriptphp-server",
     "description": "Application skeleton for StoneScriptPHP. Ready-to-use project template with CLI tools, folder structure, and examples. Includes the stonescriptphp framework as a dependency.",
     "type": "project",
-    "version": "3.10.1",
+    "version": "3.21.0",
     "license": "MIT",
     "keywords": [
         "stonescriptphp",
@@ -28,9 +28,10 @@
     ],
     "require": {
         "php": "^8.2",
-        "progalaxyelabs/stonescriptphp": "^3.0"
+        "progalaxyelabs/stonescriptphp": "^3.21"
     },
     "require-dev": {
+        "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^11.0"
     },
     "autoload": {

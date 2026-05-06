@@ -39,8 +39,7 @@ logs/*
 .env.*.local
 
 # Vendor (will be installed during build)
-# Uncomment if you want to install during build instead of copying
-# vendor/
+vendor/
 
 # Temporary files
 tmp/
