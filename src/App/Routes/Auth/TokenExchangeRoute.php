@@ -69,7 +69,8 @@ class TokenExchangeRoute implements IRouteHandler
 
         $claims = $validator->validateJWT($identityToken);
         if (!$claims) {
-            return res_error('Invalid or expired identity token', null, 401);
+            // AUTH-SPEC §4c Response 401: machine-readable error code in data object
+            return new ApiResponse('error', 'Invalid or expired identity token', ['error' => 'invalid_identity_token'], 401);
         }
 
         // Extract identity info from validated token
@@ -79,11 +80,13 @@ class TokenExchangeRoute implements IRouteHandler
         $platformCode = $claims['platform_code'] ?? null;
 
         if (!$identityId) {
-            return res_error('Token missing identity_id claim');
+            return new ApiResponse('error', 'Token missing identity_id claim', ['error' => 'invalid_identity_token'], 401);
         }
 
         if (!$tenantId) {
-            return res_error('Token missing tenant_id claim - user must select a tenant first');
+            // AUTH-SPEC §4c / line 1342: tenant-less JWTs also return invalid_identity_token
+            // (spec says: "Rejects tenant-less JWTs with `invalid_identity_token`")
+            return new ApiResponse('error', 'Token missing tenant_id claim — user must select a tenant first', ['error' => 'invalid_identity_token'], 401);
         }
 
         // ─────────────────────────────────────────────────────────────────────────
