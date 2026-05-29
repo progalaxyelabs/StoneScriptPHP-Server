@@ -1428,3 +1428,156 @@ PHP API). Status as of 2026-05-29.
 | Q6 | Abandoned `confirm_handle` TTL = 1h (same sweeper as `oauth_pending_connections`). If expired, new Google auth required. |
 | Q7 | `POST /api/oauth/promote` still exists under D2, but scope changes: identity is now created at callback/confirm time; promote only finalises the OAuth connection row. |
 | Q8 | Logout: call `POST /api/auth/logout` with identity `refresh_token`. Platform JWT has no refresh token — discard locally. Platform JWT expires in 1h naturally. |
+
+---
+
+## 13. Client Implementation Contract
+
+The server spec (§1–§12) defines endpoint contracts. This section consolidates **what the
+client MUST do** — derived directly from the server sections. Every requirement here is
+attributable to a server section. A client that calls the wrong endpoint or mishandles a
+response is a bug, same as a server that returns the wrong shape.
+
+### 13.1 Page → Endpoint Mapping
+
+| Page/Route | Endpoint to call | Server ref |
+|------------|------------------|------------|
+| `/auth/login` (send step) | `POST /api/auth/login/email/otp/send` | §1a |
+| `/auth/register` (send step) | `POST /api/auth/register/email/otp/send` | §1b |
+| `/auth/login` (verify step) | `POST /api/auth/login/email/otp/verify` | §1c |
+| `/auth/register` (verify step) | `POST /api/auth/register/email/otp/verify` | §1d |
+| `/auth/accept-invite` | `POST /api/auth/accept-invite` | §6b |
+| Onboarding / provision | `POST /api/auth/provision-tenant` (platform API) | §5a |
+
+> **Critical (derived from §1a):** `/auth/register` MUST call register endpoints,
+> `/auth/login` MUST call login endpoints. A register page that calls login endpoints is
+> a client bug — per §1a, the server returns `identity_not_found` for new users on login.
+
+### 13.2 Response Handling Requirements
+
+| Response field/error | Client MUST | Server ref |
+|---------------------|-------------|------------|
+| `requires_tenant_selection: true` | Show `TenantSelectComponent` with `memberships[]` list | §1c |
+| `membership: {...}` (single tenant) | Skip tenant selection, proceed to exchange (external) or dashboard (builtin) | §1c |
+| `identity_was_created: true` + `membership: null` | Navigate to onboarding/provision-tenant | §1d |
+| `error: "identity_not_found"` (login-send) | Show "No account found. Please sign up." — do NOT auto-create | §1a |
+| `error: "identity_exists"` (register-send) | Show "Account exists. Please sign in." — do NOT proceed | §1b |
+| `error: "invitation_pending"` | Show "You have a pending invite to join {invite_hint}. Check your email." — do NOT create identity | §1f |
+| `error: "no_account"` + `confirm_handle` (OAuth signin) | Show confirm dialog: "No account for {email}. Create one?" On YES → call `POST /api/auth/oauth/confirm-signup` | §3b, §3c |
+| `oauth_pending: true` | Store `oauth_state`, pass to provision-tenant request | §3b, §5a |
+
+### 13.3 Post-Auth Token Flow (external mode)
+
+```
+Scenario                            Client Actions                                      Server ref
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+OTP/OAuth verify (single tenant)    → Store identity JWT + refresh_token                §1c, §3b
+                                    → Call POST /api/auth/exchange                      §4c
+                                    → Store platform JWT
+                                    → Navigate to dashboard
+
+OTP/OAuth verify (multi-tenant)     → Store identity JWT + refresh_token                §1c
+                                    → Show TenantSelectComponent                        §5b
+                                    → On selection: TenantSelectComponent calls
+                                      select-tenant internally                          §5b
+                                    → Call POST /api/auth/exchange                      §4c
+                                    → Store platform JWT
+                                    → Navigate to dashboard
+
+OTP/OAuth verify (new identity)     → Store identity JWT + refresh_token                §1d, §3b
+                                    → Navigate to onboarding
+                                    → On submit: POST /api/auth/provision-tenant        §5a
+                                      (with oauth_state if OAuth)
+                                    → Store platform JWT from response (NOT identity)  §5a token contract
+                                    → DO NOT call refresh or exchange                   §5a token contract
+                                    → Navigate to dashboard
+
+Accept invite                       → POST /api/auth/accept-invite                      §6b
+                                    → Store identity JWT (already has tenant_id)        §6b
+                                    → Call POST /api/auth/exchange                      §4c
+                                    → Store platform JWT
+                                    → Navigate to dashboard
+
+401 during API call                 → Call POST /api/auth/refresh                       §4a
+                                      (identity JWT refreshed, tenant_id preserved)
+                                    → Call POST /api/auth/exchange                      §4a
+                                      (get new platform JWT)
+                                    → Retry original request
+                                    → If refresh fails → redirect to login
+```
+
+### 13.4 Critical Client Rules
+
+1. **Never call refresh after provision-tenant (§5a token contract).** The provision
+   response contains a platform JWT. Calling refresh discards tenant context (root cause
+   of 2026-05-28 bug, documented in §5a).
+
+2. **Never call exchange after provision-tenant (§5a).** Per §5a step 4, provision calls
+   exchange internally.
+
+3. **Register page MUST call register endpoints (§1a, §1b).** A `/auth/register` route
+   that redirects to `/auth/login` or renders a login component in login mode is a client
+   bug — per §1a, server returns `identity_not_found` for new users.
+
+4. **Store tokens from the correct response (§5a token contract).** After provision-tenant,
+   store `access_token` from the provision response (platform JWT), not from a subsequent
+   refresh call.
+
+5. **Pass `idempotency_key` to provision-tenant (§5a S9).** Generate UUID client-side,
+   include in request. Required for safe retries on network failure per §5a.
+
+6. **Pass `oauth_state` to provision-tenant for OAuth signups (§5a, §3b).** When
+   `oauth_pending: true` is in the verify response (§3b), store `oauth_state` and pass it
+   to provision-tenant so the server can finalize the OAuth connection (§5a step 3).
+
+7. **On `invitation_pending`, do NOT proceed with registration (§1f).** Per §1f, the user
+   already has a pending invite. Redirect to accept-invite or show `invite_hint`.
+
+8. **On OAuth `no_account` with signin intent, do NOT auto-create (§3b, P2).** Per §3b
+   and P2 (explicit intent), show a confirmation dialog. Only call `confirm-signup` (§3c)
+   if the user explicitly confirms.
+
+### 13.5 Route Rendering Invariants (derived from §1a, §1b, §6b)
+
+| Route | MUST render | MUST NOT render | Why (server behavior) |
+|-------|-------------|-----------------|----------------------|
+| `/auth/login` | Login component in LOGIN mode | Register component, login in register mode | §1a returns `identity_not_found` for new users |
+| `/auth/register` | Register component in REGISTER mode | Login component, register in login mode | §1b returns `identity_exists` for existing users |
+| `/auth/accept-invite` | Accept-invite component | Login or register component | §6b expects invite token |
+
+A route that renders the wrong component or the right component in the wrong mode will
+call the wrong endpoints and break the auth flow. This is a client bug.
+
+### 13.6 OAuth Intent Propagation (§3a, P2)
+
+Per §3a, when initiating OAuth, the client MUST:
+
+1. Pass `intent: "signin"` for login flows, `intent: "signup"` for registration flows
+2. Per P2, the intent is stored server-side and used at callback to apply the resolution matrix
+3. Per §3b: **signin + no account** → server returns `no_account` with `confirm_handle`
+4. Per §3b + P3: **signup + existing account** → server silently logs in (safe per P3)
+
+Client MUST handle the `no_account` response by showing a confirmation UI per §3b, then
+calling `POST /api/auth/oauth/confirm-signup` per §3c if user confirms.
+
+### 13.7 Logout Flow (§4b)
+
+Per §4b, the client MUST:
+
+1. Call `POST /api/auth/logout` with the identity `refresh_token` in the request body
+2. Discard identity JWT from local storage
+3. Discard platform JWT from local storage
+4. Redirect to `/auth/login`
+
+> Per §4b: Platform JWTs have no server-side revocation — they expire naturally in 1h.
+> The identity refresh token is what gets revoked.
+
+### 13.8 Display Name Requirement (§1b)
+
+Per §1b, `display_name` is **required** on `POST /api/auth/register/email/otp/send`.
+
+The register page MUST:
+1. Collect the user's display name before sending the OTP
+2. Pass `display_name` in the request body
+3. Per §1b, a request without `display_name` will return `400 display_name_required`
