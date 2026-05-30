@@ -1389,7 +1389,7 @@ PHP API). Status as of 2026-05-29.
 | access_token TTL = 3600 s | `jwt.rs` `ACCESS_TOKEN_TTL_SECONDS = 3600` |
 | refresh_token TTL = 30 days | `jwt.rs` `REFRESH_TOKEN_TTL_SECONDS = 2_592_000` |
 | oauth_state TTL = 1 h | `003_create_oauth_pending_connections.pssql` comment |
-| exchange requires tenant_id in JWT | `TokenExchangeRoute.php` line ~75: `if (!$tenantId) return res_error(...)` |
+| exchange requires tenant_id in JWT | `TokenExchangeRoute.php` line ~86: `return new ApiResponse('error', ..., ['error' => 'invalid_identity_token'], 401)` ✅ structured error code added (#2639/#2696) |
 | select-tenant stamps JWT | `TenantSelectComponent.ts` line 93: `this.auth.selectTenant(...)` internal call |
 | provision-tenant returns platform JWT | `TokenExchangeRoute.php` called inside provision flow |
 | oauth_pending refresh_token = null | `auth.rs` line ~2047: `refresh_token: None` |
