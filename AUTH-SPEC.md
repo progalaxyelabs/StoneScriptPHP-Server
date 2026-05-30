@@ -1409,8 +1409,8 @@ PHP API). Status as of 2026-05-29.
 | **D2** `identity_was_created` naming in OAuth responses | `is_new_identity: bool` | `identity_was_created: bool` | `auth.rs` `LoginNewIdentityResponse` + callers |
 | **S1** Path prefix | ExternalAuthRoutes: `/auth/` (no `/api/`) | `/api/auth/`, `/api/identity/`, etc. | `ExternalAuthRoutes.php` prefix default |
 | **S10** `identity_already_exists` in OTP verify | `otp.rs` line 753: `message: "identity_already_exists"` | `identity_exists` (canonical) | `otp.rs` OtpVerifyMode::Register branch |
-| **§1b** `invitation_pending` check | Not implemented | Block register-send when pending invite exists for email | `otp.rs` send handler + new DB function |
-| **§1f** `invitation_pending` for OAuth signup | Not implemented | Same check in OAuth callback when `intent=signup` | `auth.rs` oauth callback |
+| ~~**§1b** `invitation_pending` check~~ | ~~Not implemented~~ | **Done** — `auth_check_pending_invitation` DB fn + `OtpSendInvitationPending` error; failing-open on DB error (commit ffe2ed3, task #2666) | `otp.rs` send handler |
+| ~~**§1f** `invitation_pending` for OAuth signup~~ | ~~Not implemented~~ | **Done** — same `auth_check_pending_invitation` call in OAuth callback `intent=signup` branch; `OAuthInvitationPending` error (commit bcc641c) | `auth.rs` oauth callback |
 | **§3c** `confirm-signup` endpoint + DB mechanics | Missing | New endpoint using `oauth_pending_connections` machinery | New handler + `auth_confirm_oauth_signup` DB function |
 | **§3d** `oauth/promote` semantics | Currently creates identity | Under D2, identity created at callback; promote only finalises connection row | `auth.rs` promote handler + `auth_promote_oauth_pending` SQL |
 | **§5a** `idempotency_key` on provision-tenant | Not present | Required field | `MedstoreProvisionTenantRoute.php` + auth server `register-tenant` |
