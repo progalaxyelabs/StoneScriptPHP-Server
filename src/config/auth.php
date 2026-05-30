@@ -7,8 +7,12 @@ return [
     //   'hybrid'   — validate external JWTs + optionally issue own tokens
     'mode' => 'external',
 
-    // URL prefix for all registered auth routes (e.g. POST /auth/login, GET /auth/me)
-    'prefix' => '/auth',
+    // URL prefix for all registered auth routes — AUTH-SPEC §S1 canonical prefix is /api/auth.
+    // When legacy_compat is true (the default), routes are ALSO answered on the old /auth prefix
+    // so existing Angular clients keep working during migration. Set legacy_compat => false once
+    // all clients have been updated to call /api/auth/*.
+    'prefix' => '/api/auth',
+    'legacy_compat' => true,
 
     // Platform identity — sent in every request to the auth service
     'platform' => [
