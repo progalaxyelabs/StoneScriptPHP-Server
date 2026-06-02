@@ -59,3 +59,4 @@ Thumbs.db
 
 # Docker test environment
 test-docker-env/
+.project-id
