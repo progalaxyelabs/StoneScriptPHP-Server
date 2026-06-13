@@ -30,6 +30,9 @@
         "php": "^8.2",
         "progalaxyelabs/stonescriptphp": "^3.21"
     },
+    "suggest": {
+        "progalaxyelabs/stonescriptphp-pay": "Payment provider abstraction (Razorpay driver included). Required for selling platforms that accept payments."
+    },
     "require-dev": {
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^11.0"
