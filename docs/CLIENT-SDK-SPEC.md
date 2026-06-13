@@ -1,9 +1,113 @@
 # StoneScriptPHP — Generated Client SDK Specification
 
-**Status:** DRAFT — awaiting review  
+**Status:** APPROVED (review sign-off 2026-06-14)
 **Author:** ProGalaxy eLabs dev team  
-**Date:** 2026-06-13  
+**Date:** 2026-06-13 · revised 2026-06-14  
 **Scope:** `php stone generate client` command, URL route conventions, relationship with `ngx-stonescriptphp-client`
+
+---
+
+## 0. Resolved Decisions (review sign-off — 2026-06-14)
+
+Outcome of the orchestrator review of the DRAFT. These OVERRIDE any conflicting text in
+the sections below; app-dev revises §§1–14 to match. Authority for tenancy + auth is
+**AUTH-SPEC** — this client spec references it, never re-defines it.
+
+### URL & grouping convention (agreed)
+
+Path shape: **`/{service}/tenant/{tenantId}/{group}/{action}[/{id}]`**
+
+- **scope** = tenancy scope (`/tenant/{tenantId}`). Resolved + authorized by framework middleware.
+  It is NOT a client namespace — in the generated client it's the silent `setTenant()` context.
+- **group** = one per **domain resource/intent** → `api.{group}.*` (kebab→camel). Per-table is the
+  common case, but the rule is by *concept*, not schema.
+- **action** = explicit verb in the URL (kebab→camel method): `items/update-name` → `items.updateName`.
+- **HTTP method rule:** reads → `GET`, writes → `POST`. The action word carries the verb; do NOT
+  map update→PUT / delete→DELETE (collapses synonym drift across 11 platforms).
+- **Naming authority (ends the dev-team `wou` debates):** *the group/action name is the contract
+  concept the endpoint serves — declared explicitly on the route. Physical schema (table, column,
+  or SQL join/FROM order) is NEVER a naming input.*
+  - single resource (even via junction-table-driven joins) → that resource's group
+  - composed / cross-entity view → a purpose group (`reports`, `dashboard`, `analytics`)
+  - column-as-resource (e.g. `item_prices.batch_number`) → name by concept: standalone → own group;
+    child-of-parent → sub-resource action on parent (`items.batches(itemId)`); else → a param
+- **Search:** entity-scoped search = an action in its group (`items.search`); genuine cross-entity
+  search = its own `search` group (`search.global`). Not "search as the broadest module."
+- **Grouping is DECLARED on the route, never inferred** from path or query.
+
+### B1 — De-medstoreapp the scoper
+`/tenant/{tenantId}/` is the fixed, framework-level tenant segment (not store/warehouse/workspace).
+`setStore()` → `setTenant()`. Vocabulary matches token/gateway/AUTH-SPEC (`tenant_id`).
+
+### B2 — Tenant authz is per AUTH-SPEC §T (mode-aware) — NOT a new rule here
+- Target platforms (medstoreapp, logisticsapp, restrantapp, instituteapp) are **T3 (Multi-Tenant/URL)**:
+  tenant-less identity JWT; tenant from URL; validated by the **store-access middleware against the
+  identity's memberships (§5c)** — a membership check, NOT a `token.tenant_id === path` compare.
+- **webmeteor = T2** (tenant in platform JWT via `/api/auth/exchange`, no URL tenant). **T1** = none.
+- The generated client is **tenancy-mode-aware**: T3 → `setTenant()`/URL param; T2 → tenant via
+  exchanged JWT, no URL tenant; T1 → none.
+- Cross-tenant/impersonation bypass: **deferred** (default-deny).
+
+### B3 — Declared grouping + no stale-dist
+Group/action declared explicitly on each route (satisfied structurally by the rigid
+`{group}/{action}[/{id}]` shape). Generated `dist/` is **un-gitignored + a CI build-gate** so a
+broken regen fails red instead of shipping.
+
+### B4 — Auth: no `auth` group in the generated business client
+Split by mode: **builtin** auth → routes are in the platform's `routes.php`, so the framework
+generates them (conformant by construction); **external** auth (private `progalaxyelabs-auth`) → NOT
+generated. Three pieces:
+- **`stonescriptphp-auth-client`** = the **contract/interface** only (interface + DTOs + error codes +
+  token convention + envelope-normalization). Opensource. No concrete network class.
+- **builtin impl** → emitted by `php stone generate client`.
+- **external impl** → a separate **private/Verdaccio** concrete adapter (e.g. `progalaxyelabs-auth-client`)
+  implementing the contract against the private daemon. Written once, reused across all platforms.
+Both impls satisfy the one AUTH-SPEC-defined interface → builtin↔external swappable, zero app change.
+This **splits** today's concrete `stonescriptphp-auth-client` (deliberate refactor, not a rename).
+The generated business client stays zero-dep; it shares only the **token convention** (keys + refresh).
+
+### B5 — Single envelope in the business client
+`MinimalHttp` handles the **builtin** envelope ONLY (`{status:"ok"|"error", message, data}`), per
+AUTH-SPEC §Response Envelopes:
+- success ⇔ `status === "ok"` → return `body.data` **verbatim, including `null`** (kill the `?? data` leak)
+- missing or `!== "ok"` ⇒ error → throw `ApiError(message, httpStatus, body)`, exposing machine code
+  `data.error` as `ApiError.code`
+- transport failures (5xx / network / non-JSON) handled distinctly → `ApiError(httpStatus)`; guard `res.json()`
+- the bare/external envelope (`{success,...}`) is the **auth-client's** job (§P5), not the business client's
+- **refresh:** endpoint + response shape pinned in the AUTH-SPEC **token contract**; read the pinned
+  field (no `data.access_token` vs `data.data.access_token` guessing). Keep 401→refresh→retry-once.
+
+### B6 — TokenStore: frozen contract, localStorage, no escape hatch (adapter deferred)
+- **Fixed by contract:** key names (`ssp_access_token` / `ssp_refresh_token`) + refresh route, owned by
+  AUTH-SPEC — this is what keeps auth-client ↔ business-client in sync.
+- **Hardcoded localStorage**; **delete the "fork to customize" line** (regen would clobber it); keep the
+  `typeof localStorage !== 'undefined'` guard consistently on ALL methods (defensive only).
+- **Injectable storage adapter is DEFERRED** — adding it later is backward-compatible (optional ctor arg
+  defaulting to localStorage). Revisit on the first real non-localStorage consumer.
+
+### B7 — Delete the medstoreapp-revert band-aid
+Remove §13 "Short-term (unblock medstoreapp QC)" entirely. No replacement — finalize the contract,
+regenerate once, fix forward.
+
+### Open-question dispositions
+1. **SSR** → out of scope. 2. **Multi-tenant switching** → T3 supports simultaneous tabs via tab-local
+URL (§T); `setTenant` re-callable; document the single-active-context constraint. 3. **Admin** →
+separate generated client (no tenant scope). 4. **Offline/PWA** → localStorage for tokens; offline data
+is a PWA-layer concern. 5. **Phasing** → **big-bang (decided 2026-06-14)** — no customers to protect, so generator
+self-containment + URL restructure + all 11 platforms migrate in **one coordinated sweep**, no
+dual-convention period. Guardrail: every platform still passes **factory QC + the un-gitignored-dist
+build-gate before any deploy** — the contract changes all at once, but no platform half-migrates and
+none deploys un-revalidated. 6. **ngx-pay** → depends on `ApiClient`; align with the new
+`stonescriptphp-pay` design.
+
+### Reconciliation required in AUTH-SPEC (single source of truth)
+§T, §5c, and the path-prefix table currently say `/stores/:storeId/portal/…`. The agreed convention is
+`/{service}/tenant/{tenantId}/{group}/{action}` (service-first, `tenant` not `store`). Apply that change
+**in AUTH-SPEC** (see the pending-amendment note in §T); this client spec defers to it.
+
+### Process gate before sign-off
+Validate the convention against ≥2 non-medstoreapp platforms (logisticsapp `/tenant`+`/warehouses`,
+webmeteor T2, an admin surface) — a contract proven only on its drafting platform ships journey-seam bugs.
 
 ---
 
@@ -17,12 +121,11 @@
 6. [TokenStore — Frozen Token Management](#6-tokenstore--frozen-token-management)
 7. [ApiClient — Module-Grouped Route Methods](#7-apiclient--module-grouped-route-methods)
 8. [URL Route Convention](#8-url-route-convention)
-9. [Tenant Scoping — setStore()](#9-tenant-scoping--setstore)
+9. [Tenant Scoping — setTenant()](#9-tenant-scoping--settenant)
 10. [Request / Response Contract](#10-request--response-contract)
 11. [Error Handling](#11-error-handling)
 12. [ngx-stonescriptphp-client — Angular Wrapper Role](#12-ngx-stonescriptphp-client--angular-wrapper-role)
 13. [Migration Path](#13-migration-path)
-14. [Open Questions](#14-open-questions)
 
 ---
 
@@ -35,13 +138,15 @@ The current `php stone generate client` command emits a TypeScript `ApiClient` c
    - npm installs a nested copy of `ngx-stonescriptphp-client` inside the generated package, causing TypeScript to see two separate declarations of the same class — breaking `new ApiClient(connection)` with TS2345.
    - The generated client is useless if the consumer doesn't also set up the Angular library.
 
-2. **Groups all routes under a single property named after the business entity** (e.g. `api.stores.*`). A platform with 200 routes ends up with 200 methods under one namespace. `api.stores.postPortalInventoryItems(storeId, data)` communicates neither the module nor the intent — `storeId` leaks into every call signature even though the consumer sets their store once per session.
+2. **Groups all routes under a single property named after the business entity** (e.g. `api.stores.*`). A platform with 200 routes ends up with 200 methods under one namespace. `api.stores.postPortalInventoryItems(storeId, data)` communicates neither the module nor the intent — `tenantId` leaks into every call signature even though the consumer sets their tenant once per session.
 
 3. **Delegates token management to the Angular library**, which then offers configurable storage strategies (localStorage, IndexedDB, cookie). This is unnecessary complexity — the choice is not meaningful for the target use case and creates decision fatigue and divergent implementations across platforms.
 
 4. **Does not own the URL convention** — the generated URL paths (e.g. `/stores/{storeId}/portal/inventory/items`) were driven by a PHP route change rather than a considered client SDK design. The service discriminator (`portal`) ends up buried after the tenant scoper (`stores/{storeId}`), inverting the natural hierarchy.
 
-The net effect: every platform that consumes the generated client needs a hand-written Angular service (`ApiClientService`) that re-maps all 200 generated methods back to raw `apiConnection.get/post` calls. The generator is producing dead weight.
+5. **Uses HTTP verbs as semantic differentiators** (PUT for update, DELETE for delete). This spreads the semantic intent across both the HTTP method and the route — creating synonym drift when teams name routes across 11 platforms independently.
+
+The net effect: every platform that consumes the generated client needs a hand-written Angular service (`ApiClientService`) that re-maps all generated methods back to raw `apiConnection.get/post` calls. The generator is producing dead weight.
 
 ---
 
@@ -51,54 +156,66 @@ The net effect: every platform that consumes the generated client needs a hand-w
 |------|-------------|
 | **Self-contained** | The generated package has zero runtime dependencies. No Angular, no axios, no external HTTP lib. |
 | **Framework-agnostic** | The generated `ApiClient` works in Angular, React, Vue, Svelte, or vanilla JS. |
-| **Module-grouped** | Routes are grouped by functional module, not by business entity: `api.inventory.create()`, `api.billing.createBill()`, `api.auth.login()`. |
-| **Store-context-once** | The consumer calls `api.setStore(id)` once after tenant selection. All subsequent portal calls use that context silently. No storeId in every method signature. |
-| **Frozen token management** | localStorage, fixed key names, no choices. The framework decides. |
+| **Module-grouped** | Routes are grouped by concept, declared on the route: `api.inventory.create()`, `api.billing.createBill()`. No `api.stores.*` catchall. |
+| **Tenant-context-once** | The consumer calls `api.setTenant(id)` once after tenant selection (T3 only). All subsequent tenant-scoped calls use that context silently. No `tenantId` in every method signature. |
+| **Frozen token management** | localStorage, fixed key names, no choices. AUTH-SPEC owns the contract. |
+| **GET/POST only** | Reads → `GET`. Writes → `POST`. The action name in the URL carries the verb. No PUT/DELETE. |
+| **Auth is separate** | The business client contains no auth routes. Auth is the domain of `stonescriptphp-auth-client` (contract interface) and its builtin or external concrete implementations. |
 | **Angular wrapper is thin** | `ngx-stonescriptphp-client` wraps the generated client for Angular-specific concerns (signals, route guards, UI components). It does not own HTTP or tokens. |
-| **Source of truth is the API** | The generated client mirrors `routes.php` exactly. When routes change, regenerate the client. No hand-maintained URL strings anywhere in Angular code. |
+| **Source of truth is the API** | The generated client mirrors `routes.php` exactly. When routes change, regenerate. No hand-maintained URL strings in Angular code. |
+| **Broken regen = red build** | `dist/` is un-gitignored. A failed regeneration fails the CI build-gate — it does not silently ship stale types. |
 
 ---
 
 ## 3. Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  Generated Package  (docker/api/client/{service}/)               │
-│  Produced by: php stone generate client                          │
-│                                                                  │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │  MinimalHttp    │  │  TokenStore     │  │  DTOs / types   │ │
-│  │  (fetch-based)  │  │  (localStorage) │  │  (from PHP DTOs)│ │
-│  └────────┬────────┘  └────────┬────────┘  └─────────────────┘ │
-│           │                    │                                  │
-│  ┌────────▼────────────────────▼───────────────────────────────┐ │
-│  │  ApiClient                                                   │ │
-│  │  - setStore(id)                                              │ │
-│  │  - auth.login()  auth.myTenants()  auth.selectTenant()      │ │
-│  │  - inventory.list()  inventory.create()  inventory.update()  │ │
-│  │  - billing.createBill()  billing.list()                     │ │
-│  │  - reports.stock()  reports.salesDaily()                    │ │
-│  │  - settings.getBusiness()  settings.update()                │ │
-│  │  - onboarding.status()  onboarding.bulkCreate()             │ │
-│  │  - ...one readonly property per module, one fn per route    │ │
+┌───────────────────────────────────────────────────────────────────┐
+│  Generated Business Client  (docker/api/client/{service}/)        │
+│  Produced by: php stone generate client                           │
+│                                                                   │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │  MinimalHttp    │  │  TokenStore     │  │  DTOs / types   │  │
+│  │  (fetch-based,  │  │  (localStorage, │  │  (from PHP DTOs)│  │
+│  │   GET+POST only)│  │   frozen keys)  │  │                 │  │
+│  └────────┬────────┘  └────────┬────────┘  └─────────────────┘  │
+│           │                    │                                   │
+│  ┌────────▼────────────────────▼────────────────────────────────┐ │
+│  │  ApiClient  (tenancy-mode-aware)                              │ │
+│  │                                                               │ │
+│  │  T3 (Multi-Tenant/URL — medstoreapp, logisticsapp, etc.):    │ │
+│  │    setTenant(id) — called once after tenant selection         │ │
+│  │    inventory.list()  inventory.create()  inventory.update()   │ │
+│  │    billing.create()  billing.list()                           │ │
+│  │    reports.stock()   reports.salesDaily()                     │ │
+│  │    settings.get()    settings.update()                        │ │
+│  │    onboarding.status()  onboarding.bulkCreate()               │ │
+│  │    ...one readonly property per group, one fn per route       │ │
+│  │                                                               │ │
+│  │  T2 (webmeteor): tenant encoded in platform JWT via exchange  │ │
+│  │    no setTenant() — no URL tenant segment                     │ │
+│  │                                                               │ │
+│  │  T1 (single-tenant): no tenant scope at all                   │ │
 │  └──────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-│  Zero external dependencies.  Plain Promises.  No Angular.       │
-└──────────────────────────────┬───────────────────────────────────┘
-                               │  wraps
-┌──────────────────────────────▼───────────────────────────────────┐
-│  ngx-stonescriptphp-client  (Angular library)                    │
-│                                                                  │
-│  - provideNgxStoneScriptPhpClient(apiUrl)                        │
-│    → constructs ApiClient, provides via Angular DI               │
-│  - AuthService: isAuthenticated signal, currentUser signal       │
-│  - Route guards (reads ApiClient token state)                    │
-│  - <lib-tenant-login> component                                  │
-│  - Error interceptor → maps ApiError to user-facing message      │
-│  - Loading/skeleton directives                                   │
-│                                                                  │
-│  Pure Angular concerns.  No HTTP, no tokens, no URL strings.     │
-└──────────────────────────────────────────────────────────────────┘
+│                                                                   │
+│  Zero external dependencies.  Plain Promises.  No Angular.        │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │  wraps
+          ┌────────────┴───────────────────────────┐
+          │                                        │
+┌─────────▼─────────────────────┐    ┌────────────▼───────────────────┐
+│  stonescriptphp-auth-client   │    │  ngx-stonescriptphp-client     │
+│  (opensource contract only)   │    │  (Angular library)             │
+│                               │    │                                │
+│  IAuthClient interface        │    │  provideNgxStoneScriptPhpClient │
+│  DTOs + error codes           │    │    → constructs ApiClient       │
+│  Token convention (keys)      │    │    → provides via Angular DI    │
+│  Envelope normalization spec  │    │  AuthService: signals, guards   │
+│  No concrete HTTP class       │    │  <lib-tenant-login> component   │
+│                               │    │  Error handler → toast/alert    │
+│  ← builtin impl: generated    │    │                                │
+│  ← external impl: private pkg │    │  No HTTP, tokens, or URLs.     │
+└───────────────────────────────┘    └────────────────────────────────┘
 ```
 
 ---
@@ -112,13 +229,14 @@ client/
 └── portal/
     ├── package.json          # zero dependencies, no peerDependencies
     ├── tsconfig.json
+    ├── .gitignore            # does NOT ignore dist/ — dist is un-gitignored (B3)
     ├── src/
     │   ├── http.ts           # MinimalHttp — emitted verbatim (not generated)
     │   ├── tokens.ts         # TokenStore — emitted verbatim (not generated)
     │   ├── errors.ts         # ApiError class — emitted verbatim
     │   ├── types.ts          # All DTOs — generated from PHP DTO classes
     │   └── client.ts         # ApiClient — generated from routes.php
-    └── dist/
+    └── dist/                 # committed — CI build-gate: regen must produce clean dist
         ├── index.js
         └── index.d.ts
 ```
@@ -129,9 +247,12 @@ client/
 {
   "name": "@stonescript/api-client",
   "version": "0.0.0",
-  "description": "Auto-generated API client for medstoreapp portal",
+  "description": "Auto-generated API client for {platform} {service}",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
   "dependencies": {},
   "peerDependencies": {},
   "devDependencies": {
@@ -142,16 +263,23 @@ client/
 
 No external runtime dependencies. The `file:` reference in the Angular service's `package.json` points here.
 
+**CI build-gate (B3):** After any route or DTO change, `php stone generate client` must be run and the resulting `dist/` committed. CI verifies that `dist/` matches a clean `tsc` build of the generated `src/`. A stale `dist/` fails the build — it does not ship silently.
+
 ---
 
 ## 5. MinimalHttp — Generated Connection Layer
 
 Emitted verbatim (not generated from routes). Included in every client output.
 
+**HTTP method constraint (B2):** Only `GET` and `POST`. The action name in the URL carries the semantic verb. No `PUT`, no `DELETE`.
+
+**Envelope contract (B5):** Handles `{status:"ok"|"error", message, data}` only. Returns `body.data` verbatim on success (including `null` — no `?? body` fallback). Exposes `body.data.error` as `ApiError.code` on failure. Guards `res.json()` against non-JSON transport errors.
+
 ```typescript
 // src/http.ts — emitted verbatim by php stone generate client
 
 import { TokenStore } from './tokens';
+import { ApiError } from './errors';
 
 export interface HttpParams {
   [key: string]: string | number | boolean | null | undefined;
@@ -161,7 +289,9 @@ export class MinimalHttp {
   constructor(
     private readonly baseUrl: string,
     private readonly tokens: TokenStore,
-    private readonly refreshEndpoint: string = '/api/auth/refresh',
+    // Refresh endpoint is pinned to the AUTH-SPEC token contract.
+    // Do not change without updating AUTH-SPEC §token-contract.
+    private readonly refreshEndpoint: string = '/api/auth/token/refresh',
   ) {}
 
   async get<T = unknown>(path: string, params?: HttpParams): Promise<T> {
@@ -172,16 +302,8 @@ export class MinimalHttp {
     return this.request<T>('POST', path, body);
   }
 
-  async put<T = unknown>(path: string, body?: unknown): Promise<T> {
-    return this.request<T>('PUT', path, body);
-  }
-
-  async delete<T = unknown>(path: string): Promise<T> {
-    return this.request<T>('DELETE', path);
-  }
-
   private async request<T>(
-    method: string,
+    method: 'GET' | 'POST',
     path: string,
     body?: unknown,
     params?: HttpParams,
@@ -200,11 +322,16 @@ export class MinimalHttp {
     const token = this.tokens.get();
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(url.toString(), {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch (networkErr) {
+      throw new ApiError('Network error — check your connection', 0, networkErr, null);
+    }
 
     // 401 → attempt one token refresh, then retry
     if (res.status === 401 && !isRetry) {
@@ -213,55 +340,71 @@ export class MinimalHttp {
         return this.request<T>(method, path, body, params, true);
       }
       this.tokens.clear();
-      throw new ApiError('Session expired. Please log in again.', 401, null);
+      throw new ApiError('Session expired. Please log in again.', 401, null, null);
     }
 
-    const data = await res.json();
-
-    // StoneScriptPHP error envelope: HTTP 200 with status "error" or "not ok"
-    if (data?.status && data.status !== 'ok') {
-      throw new ApiError(data.message ?? 'Request failed', res.status, data);
+    // Guard non-JSON responses (5xx HTML error pages, etc.)
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      throw new ApiError(
+        `Server returned non-JSON response (HTTP ${res.status})`,
+        res.status,
+        null,
+        null,
+      );
     }
 
-    // Unwrap the data envelope — callers receive data.data, not the full envelope
-    return (data?.data ?? data) as T;
+    // StoneScriptPHP envelope: {status, message, data}
+    // success ⇔ status === "ok" → return body.data verbatim (B5)
+    const envelope = data as Record<string, unknown>;
+    if (!envelope || envelope['status'] !== 'ok') {
+      const message = (envelope?.['message'] as string) ?? 'Request failed';
+      const code    = (envelope?.['data'] as Record<string, unknown>)?.['error'] as string ?? null;
+      throw new ApiError(message, res.status, envelope, code);
+    }
+
+    // Return data.data verbatim — null is a valid value, do NOT fall back to body (B5)
+    return envelope['data'] as T;
   }
 
   private async attemptRefresh(): Promise<boolean> {
     const refresh = this.tokens.getRefresh();
     if (!refresh) return false;
 
+    let res: Response;
     try {
-      const res = await fetch(this.baseUrl + this.refreshEndpoint, {
+      res = await fetch(this.baseUrl + this.refreshEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refresh }),
       });
-
-      if (!res.ok) return false;
-
-      const data = await res.json();
-      if (data?.access_token) {
-        this.tokens.set(data.access_token);
-        if (data?.refresh_token) this.tokens.setRefresh(data.refresh_token);
-        return true;
-      }
     } catch {
-      // network failure during refresh → treat as not refreshed
+      return false;
+    }
+
+    if (!res.ok) return false;
+
+    let data: unknown;
+    try { data = await res.json(); } catch { return false; }
+
+    // Read the field name pinned in AUTH-SPEC §token-contract.
+    // Do not guess between data.access_token and data.data.access_token — they are different envelopes.
+    const envelope = data as Record<string, unknown>;
+    const newAccess  = envelope?.['data'] !== undefined
+      ? (envelope['data'] as Record<string, unknown>)?.['access_token'] as string | undefined
+      : envelope?.['access_token'] as string | undefined;
+
+    if (newAccess) {
+      this.tokens.set(newAccess);
+      const newRefresh = (envelope?.['data'] as Record<string, unknown>)?.['refresh_token']
+        ?? envelope?.['refresh_token'];
+      if (typeof newRefresh === 'string') this.tokens.setRefresh(newRefresh);
+      return true;
     }
 
     return false;
-  }
-}
-
-export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly httpStatus: number,
-    public readonly response: unknown,
-  ) {
-    super(message);
-    this.name = 'ApiError';
   }
 }
 ```
@@ -270,11 +413,14 @@ export class ApiError extends Error {
 
 ## 6. TokenStore — Frozen Token Management
 
-Emitted verbatim. Not configurable. Not injectable. The framework decides the storage strategy.
+Emitted verbatim. Not configurable. Not injectable. AUTH-SPEC owns the key names and refresh route — this class is the single implementation of that contract in the business client.
+
+The `typeof localStorage !== 'undefined'` guard is present on **every** read and write method — defensive against SSR/test environments, not an indication that SSR is supported (it is out of scope per §0 OQ1).
 
 ```typescript
 // src/tokens.ts — emitted verbatim by php stone generate client
 
+// Key names are owned by AUTH-SPEC §token-contract. Do not rename.
 const ACCESS_KEY  = 'ssp_access_token';
 const REFRESH_KEY = 'ssp_refresh_token';
 
@@ -286,7 +432,9 @@ export class TokenStore {
   }
 
   set(token: string): void {
-    localStorage.setItem(ACCESS_KEY, token);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(ACCESS_KEY, token);
+    }
   }
 
   getRefresh(): string | null {
@@ -296,12 +444,16 @@ export class TokenStore {
   }
 
   setRefresh(token: string): void {
-    localStorage.setItem(REFRESH_KEY, token);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(REFRESH_KEY, token);
+    }
   }
 
   clear(): void {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(ACCESS_KEY);
+      localStorage.removeItem(REFRESH_KEY);
+    }
   }
 
   hasToken(): boolean {
@@ -310,46 +462,55 @@ export class TokenStore {
 }
 ```
 
-**Rationale for freezing:**
-- The target use case is a browser SPA. localStorage is appropriate.
+**Why localStorage is frozen (B6):**
+- Target use case is a browser SPA. localStorage is appropriate.
 - IndexedDB is async and overkill for a JWT string.
 - HttpOnly cookies require server-side session handling — a different auth model entirely.
-- Making storage configurable adds complexity with no practical benefit. Platforms that genuinely need a different strategy can fork the generated output.
+- An injectable storage adapter is deferred — the first real non-localStorage consumer triggers that work. Adding it later is backward-compatible (optional constructor arg defaulting to localStorage).
 
 ---
 
 ## 7. ApiClient — Module-Grouped Route Methods
 
-The generator reads `routes.php` and groups routes by their functional path segment. The grouping key is the first non-scoping path segment after the service prefix and storeId.
+The generator reads `routes.php` and groups routes by the `group` declared on each route definition. The group name is the API concept served — **never** inferred from path segments, table names, or SQL schema.
 
-**Grouping rule:**
+### Grouping table (T3 portal — medstoreapp example)
 
-| Route path | Module group |
-|------------|-------------|
-| `/portal/store/{storeId}/inventory/*` | `inventory` |
-| `/portal/store/{storeId}/billing/*` | `billing` |
-| `/portal/store/{storeId}/reports/*` | `reports` |
-| `/portal/store/{storeId}/settings/*` | `settings` |
-| `/portal/store/{storeId}/users/*` | `users` |
-| `/portal/store/{storeId}/onboarding/*` | `onboarding` |
-| `/portal/store/{storeId}/stock-reconciliation/*` | `stockReconciliation` |
-| `/portal/store/{storeId}/payments/*` | `payments` |
-| `/api/auth/*` | `auth` |
-| `/api/devices/*` | `devices` |
+| Route declaration | Group | Generated method |
+|------------------|-------|-----------------|
+| `GET /portal/tenant/{tenantId}/items` | `inventory` | `inventory.list()` |
+| `GET /portal/tenant/{tenantId}/items/{id}` | `inventory` | `inventory.get(id)` |
+| `GET /portal/tenant/{tenantId}/items/search` | `inventory` | `inventory.search(params)` |
+| `POST /portal/tenant/{tenantId}/items/create` | `inventory` | `inventory.create(data)` |
+| `POST /portal/tenant/{tenantId}/items/{id}/update` | `inventory` | `inventory.update(id, data)` |
+| `POST /portal/tenant/{tenantId}/items/{id}/delete` | `inventory` | `inventory.delete(id)` |
+| `POST /portal/tenant/{tenantId}/items/{id}/adjust` | `inventory` | `inventory.adjust(id, data)` |
+| `GET /portal/tenant/{tenantId}/bills` | `billing` | `billing.list()` |
+| `POST /portal/tenant/{tenantId}/bills/create` | `billing` | `billing.create(data)` |
+| `POST /portal/tenant/{tenantId}/bills/{id}/delete` | `billing` | `billing.delete(id)` |
+| `GET /portal/tenant/{tenantId}/reports/stock` | `reports` | `reports.stock()` |
+| `GET /portal/tenant/{tenantId}/reports/sales/daily` | `reports` | `reports.salesDaily(params)` |
+| `GET /portal/tenant/{tenantId}/dashboard` | `dashboard` | `dashboard.summary()` |
+| `GET /portal/tenant/{tenantId}/settings/business` | `settings` | `settings.getBusiness()` |
+| `POST /portal/tenant/{tenantId}/settings/business/update` | `settings` | `settings.updateBusiness(data)` |
+| `GET /subscription/status` | `subscription` | `subscription.status()` |
+| `POST /subscription/orders/create` | `subscription` | `subscription.createOrder(data)` |
 
-**Generated output shape:**
+**Note on T2 and T1:** For T2 platforms (webmeteor), the tenant is encoded in the platform JWT; no `/tenant/{tenantId}` segment exists in URLs and `setTenant()` is not generated. For T1 platforms, no tenant scope at all.
+
+**Generated output shape (T3 example — medstoreapp portal):**
 
 ```typescript
 // src/client.ts — generated from routes.php
 
-import { MinimalHttp } from './http';
-import { TokenStore }  from './tokens';
-import * as T from './types';
+import { MinimalHttp, HttpParams } from './http';
+import { TokenStore }              from './tokens';
+import * as T                      from './types';
 
 export class ApiClient {
   readonly tokens: TokenStore;        // exposed so ngx wrapper can read auth state
   private readonly http: MinimalHttp;
-  private _storeId: string | number | null = null;
+  private _tenantId: string | number | null = null;
 
   constructor(baseUrl: string) {
     this.tokens = new TokenStore();
@@ -357,196 +518,183 @@ export class ApiClient {
   }
 
   /**
-   * Set the active store (tenant) context.
-   * Must be called once after the user selects a tenant.
-   * All portal module calls will use this storeId in the URL path.
+   * Set the active tenant context (T3 platforms only).
+   * Call once after the user selects a tenant. Re-callable for tenant switching.
+   * All tenant-scoped module calls will use this tenantId in the URL path.
+   * Single-active-context constraint: this instance tracks one tenant at a time.
+   * For simultaneous multi-tenant access, create separate ApiClient instances.
    */
-  setStore(id: string | number): this {
-    this._storeId = id;
+  setTenant(id: string | number): this {
+    this._tenantId = id;
     return this;
   }
 
-  private get s(): string {
-    if (this._storeId === null) {
-      throw new Error('[ApiClient] Store context not set. Call setStore(id) after tenant selection.');
+  private get t(): string {
+    if (this._tenantId === null) {
+      throw new Error(
+        '[ApiClient] Tenant context not set. Call setTenant(id) after tenant selection.',
+      );
     }
-    return `/portal/store/${this._storeId}`;
+    return `/portal/tenant/${this._tenantId}`;
   }
 
   // ─────────────────────────────────────────────────────────────
-  // auth — no store context required
-  // ─────────────────────────────────────────────────────────────
-  readonly auth = {
-    login:          (d: T.LoginRequest)           => this.http.post<T.LoginResponse>('/api/auth/login', d),
-    myTenants:      ()                            => this.http.get<T.Tenant[]>('/api/auth/my-tenants'),
-    selectTenant:   (d: T.SelectTenantRequest)    => this.http.post<T.TokenResponse>('/api/auth/select-tenant', d),
-    registerTenant: (d: T.RegisterTenantRequest)  => this.http.post<T.Tenant>('/api/auth/register-tenant', d),
-    currentTenant:  ()                            => this.http.get<T.Tenant>('/api/auth/current-tenant'),
-    profile:        ()                            => this.http.get<T.UserProfile>('/api/auth/profile'),
-    provisionTenant:(d: T.ProvisionTenantRequest) => this.http.post<T.Tenant>('/api/auth/provision-tenant', d),
-    acceptInvite:   (d: T.AcceptInviteRequest)    => this.http.post<T.TokenResponse>('/api/auth/accept-invite', d),
-  };
-
-  // ─────────────────────────────────────────────────────────────
-  // inventory — store context required
+  // inventory — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly inventory = {
-    list:        (p?: T.ListItemsParams)          => this.http.get<T.InventoryListResponse>(`${this.s}/inventory/items`, p),
-    create:      (d: T.CreateItemRequest)         => this.http.post<T.Item>(`${this.s}/inventory/items`, d),
-    update:      (id: number, d: T.UpdateItemRequest) => this.http.put<T.Item>(`${this.s}/inventory/item/${id}`, d),
-    delete:      (id: number)                     => this.http.delete(`${this.s}/inventory/item/${id}`),
-    getById:     (id: number)                     => this.http.get<T.ItemDetail>(`${this.s}/inventory/item/${id}/details`),
-    search:      (p: T.SearchItemsParams)         => this.http.get<T.Item[]>(`${this.s}/inventory/items/search`, p),
-    lowStock:    ()                               => this.http.get<T.Item[]>(`${this.s}/inventory/low-stock`),
-    expiring:    ()                               => this.http.get<T.Item[]>(`${this.s}/inventory/items/expiring`),
-    vendors:     ()                               => this.http.get<T.Vendor[]>(`${this.s}/inventory/vendors`),
-    createVendor:(d: T.CreateVendorRequest)       => this.http.post<T.Vendor>(`${this.s}/inventory/vendors`, d),
-    distributors:()                               => this.http.get<T.Distributor[]>(`${this.s}/inventory/distributors`),
-    createDistributor: (d: T.CreateDistributorRequest) => this.http.post<T.Distributor>(`${this.s}/inventory/distributors`, d),
-    manufacturers:()                              => this.http.get<T.Manufacturer[]>(`${this.s}/inventory/manufacturers`),
-    locations:   ()                               => this.http.get<T.Location[]>(`${this.s}/inventory/item_locations`),
-    createItemPrice: (d: T.CreateItemPriceRequest)=> this.http.post<T.ItemPrice>(`${this.s}/inventory/item_prices`, d),
-    adjust:      (id: number, d: T.AdjustRequest) => this.http.post(`${this.s}/inventory/item/${id}/adjust`, d),
+    list:        (p?: T.ListItemsParams)          => this.http.get<T.InventoryListResponse>(`${this.t}/items`, p),
+    get:         (id: number)                     => this.http.get<T.ItemDetail>(`${this.t}/items/${id}`),
+    search:      (p: T.SearchItemsParams)         => this.http.get<T.Item[]>(`${this.t}/items/search`, p),
+    lowStock:    ()                               => this.http.get<T.Item[]>(`${this.t}/items/low-stock`),
+    expiring:    ()                               => this.http.get<T.Item[]>(`${this.t}/items/expiring`),
+    batches:     (itemId: number)                 => this.http.get<T.Batch[]>(`${this.t}/items/${itemId}/batches`),
+    create:      (d: T.CreateItemRequest)         => this.http.post<T.Item>(`${this.t}/items/create`, d),
+    update:      (id: number, d: T.UpdateItemRequest) => this.http.post<T.Item>(`${this.t}/items/${id}/update`, d),
+    delete:      (id: number)                     => this.http.post(`${this.t}/items/${id}/delete`, {}),
+    adjust:      (id: number, d: T.AdjustRequest) => this.http.post(`${this.t}/items/${id}/adjust`, d),
+    vendors:     ()                               => this.http.get<T.Vendor[]>(`${this.t}/vendors`),
+    createVendor:(d: T.CreateVendorRequest)       => this.http.post<T.Vendor>(`${this.t}/vendors/create`, d),
+    distributors:()                               => this.http.get<T.Distributor[]>(`${this.t}/distributors`),
+    createDistributor: (d: T.CreateDistributorRequest) => this.http.post<T.Distributor>(`${this.t}/distributors/create`, d),
+    locations:   ()                               => this.http.get<T.Location[]>(`${this.t}/item-locations`),
+    createBatch: (d: T.CreateBatchRequest)        => this.http.post<T.Batch>(`${this.t}/batches/create`, d),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // billing — store context required
+  // billing — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly billing = {
-    list:        ()                               => this.http.get<T.BillListResponse>(`${this.s}/billing/bills`),
-    create:      (d: T.CreateBillRequest)         => this.http.post<T.Bill>(`${this.s}/billing/bills`, d),
-    getById:     (id: number)                     => this.http.get<T.BillDetail>(`${this.s}/billing/bills/${id}`),
-    update:      (id: number, d: T.UpdateBillRequest) => this.http.put<T.Bill>(`${this.s}/billing/bills/${id}`, d),
-    delete:      (id: number)                     => this.http.delete(`${this.s}/billing/bills/${id}`),
-    dailySummary:()                               => this.http.get(`${this.s}/billing/daily-summary`),
-    reserve:     (d: T.BillingReserveRequest)     => this.http.post(`${this.s}/billing/reserve`, d),
-    clearReserve:(billNumber: string, itemPriceId?: number) =>
-                   this.http.delete(`${this.s}/billing/reserve/${billNumber}${itemPriceId ? '/' + itemPriceId : ''}`),
+    list:        ()                               => this.http.get<T.BillListResponse>(`${this.t}/bills`),
+    get:         (id: number)                     => this.http.get<T.BillDetail>(`${this.t}/bills/${id}`),
+    dailySummary:()                               => this.http.get(`${this.t}/bills/daily-summary`),
+    create:      (d: T.CreateBillRequest)         => this.http.post<T.Bill>(`${this.t}/bills/create`, d),
+    update:      (id: number, d: T.UpdateBillRequest) => this.http.post<T.Bill>(`${this.t}/bills/${id}/update`, d),
+    delete:      (id: number)                     => this.http.post(`${this.t}/bills/${id}/delete`, {}),
+    reserve:     (d: T.BillingReserveRequest)     => this.http.post(`${this.t}/bills/reserve`, d),
+    clearReserve:(d: T.ClearReserveRequest)       => this.http.post(`${this.t}/bills/reserve/clear`, d),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // invoices (distributor purchase invoices)
+  // invoices (distributor purchase invoices) — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly invoices = {
-    list:        (p?: T.ListInvoicesParams)       => this.http.get<T.InvoiceListResponse>(`${this.s}/invoices`, p),
-    create:      (d: T.CreateInvoiceRequest)      => this.http.post<T.Invoice>(`${this.s}/invoices`, d),
-    getById:     (id: number)                     => this.http.get<T.InvoiceDetail>(`${this.s}/invoices/${id}`),
-    update:      (id: number, d: T.UpdateInvoiceRequest) => this.http.put<T.Invoice>(`${this.s}/invoices/${id}`, d),
-    delete:      (id: number)                     => this.http.delete(`${this.s}/invoices/${id}`),
-    attachments: (id: number)                     => this.http.get<T.Attachment[]>(`${this.s}/invoices/${id}/attachments`),
-    addAttachment: (id: number, d: T.AddAttachmentRequest) => this.http.post(`${this.s}/invoices/${id}/attachments`, d),
-    deleteAttachment: (id: number, attachmentId: number)   => this.http.delete(`${this.s}/invoices/${id}/attachments/${attachmentId}`),
-    submitDistributor: (d: T.DistributorInvoiceRequest) => this.http.post(`${this.s}/distributor-invoice/submit`, d),
-    updateDistributor: (id: number, d: T.DistributorInvoiceRequest) => this.http.put(`${this.s}/distributor-invoice/${id}`, d),
-    getDistributorById:(id: number)               => this.http.get(`${this.s}/distributor-invoice/${id}`),
+    list:              (p?: T.ListInvoicesParams) => this.http.get<T.InvoiceListResponse>(`${this.t}/invoices`, p),
+    get:               (id: number)               => this.http.get<T.InvoiceDetail>(`${this.t}/invoices/${id}`),
+    attachments:       (id: number)               => this.http.get<T.Attachment[]>(`${this.t}/invoices/${id}/attachments`),
+    create:            (d: T.CreateInvoiceRequest) => this.http.post<T.Invoice>(`${this.t}/invoices/create`, d),
+    update:            (id: number, d: T.UpdateInvoiceRequest) => this.http.post<T.Invoice>(`${this.t}/invoices/${id}/update`, d),
+    delete:            (id: number)               => this.http.post(`${this.t}/invoices/${id}/delete`, {}),
+    addAttachment:     (id: number, d: T.AddAttachmentRequest) => this.http.post(`${this.t}/invoices/${id}/attachments/add`, d),
+    deleteAttachment:  (id: number, attachmentId: number) => this.http.post(`${this.t}/invoices/${id}/attachments/${attachmentId}/delete`, {}),
+    submitDistributor: (d: T.DistributorInvoiceRequest) => this.http.post(`${this.t}/distributor-invoices/submit`, d),
+    updateDistributor: (id: number, d: T.DistributorInvoiceRequest) => this.http.post(`${this.t}/distributor-invoices/${id}/update`, d),
+    getDistributor:    (id: number)               => this.http.get(`${this.t}/distributor-invoices/${id}`),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // dashboard
+  // dashboard — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly dashboard = {
-    summary:     ()                               => this.http.get<T.DashboardResponse>(`${this.s}/dashboard`),
-    stats:       ()                               => this.http.get<T.DashboardStats>(`${this.s}/dashboard/stats`),
-    activities:  (p?: T.ActivitiesParams)         => this.http.get(`${this.s}/dashboard/activities`, p),
-    sales:       (p?: T.SalesParams)              => this.http.get(`${this.s}/dashboard/sales`, p),
+    summary:    ()                                => this.http.get<T.DashboardResponse>(`${this.t}/dashboard`),
+    stats:      ()                                => this.http.get<T.DashboardStats>(`${this.t}/dashboard/stats`),
+    activities: (p?: T.ActivitiesParams)          => this.http.get(`${this.t}/dashboard/activities`, p),
+    sales:      (p?: T.SalesParams)               => this.http.get(`${this.t}/dashboard/sales`, p),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // reports
+  // reports — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly reports = {
-    stock:           ()                           => this.http.get<T.StockReportResponse>(`${this.s}/reports/stock`),
-    salesDaily:      (date?: string)              => this.http.get(`${this.s}/reports/sales/daily`, { date }),
-    salesMonthly:    (month?: number, year?: number) => this.http.get(`${this.s}/reports/sales/monthly`, { month, year }),
-    cashDaily:       (date?: string)              => this.http.get(`${this.s}/reports/cash/daily`, { date }),
-    cashMonthly:     (month?: number, year?: number) => this.http.get(`${this.s}/reports/cash/monthly`, { month, year }),
-    profitLossDaily: (date?: string)              => this.http.get(`${this.s}/reports/profit-loss/daily`, { date }),
-    profitLossMonthly:(month?: number, year?: number) => this.http.get(`${this.s}/reports/profit-loss/monthly`, { month, year }),
-    caPackage:       (month: number, year: number, format: 'json' | 'pdf') =>
-                       this.http.get(`${this.s}/reports/ca-package`, { month, year, format }),
+    stock:            ()                          => this.http.get<T.StockReportResponse>(`${this.t}/reports/stock`),
+    salesDaily:       (p?: T.DateParams)          => this.http.get(`${this.t}/reports/sales/daily`, p),
+    salesMonthly:     (p?: T.MonthYearParams)     => this.http.get(`${this.t}/reports/sales/monthly`, p),
+    cashDaily:        (p?: T.DateParams)          => this.http.get(`${this.t}/reports/cash/daily`, p),
+    cashMonthly:      (p?: T.MonthYearParams)     => this.http.get(`${this.t}/reports/cash/monthly`, p),
+    profitLossDaily:  (p?: T.DateParams)          => this.http.get(`${this.t}/reports/profit-loss/daily`, p),
+    profitLossMonthly:(p?: T.MonthYearParams)     => this.http.get(`${this.t}/reports/profit-loss/monthly`, p),
+    caPackage:        (p: T.CaPackageParams)      => this.http.get(`${this.t}/reports/ca-package`, p),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // settings
+  // settings — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly settings = {
-    getBusiness:   ()                             => this.http.get<T.BusinessSettings>(`${this.s}/settings/business`),
-    updateBusiness:(d: T.UpdateBusinessSettings)  => this.http.put<T.BusinessSettings>(`${this.s}/settings/business`, d),
-    list:          ()                             => this.http.get(`${this.s}/settings`),
-    getByKey:      (key: string)                  => this.http.get(`${this.s}/settings/${key}`),
-    set:           (d: T.SetSettingRequest)       => this.http.post(`${this.s}/settings`, d),
-    delete:        (key: string)                  => this.http.delete(`${this.s}/settings/${key}`),
+    getBusiness:    ()                            => this.http.get<T.BusinessSettings>(`${this.t}/settings/business`),
+    list:           ()                            => this.http.get(`${this.t}/settings`),
+    getByKey:       (key: string)                 => this.http.get(`${this.t}/settings/${key}`),
+    updateBusiness: (d: T.UpdateBusinessSettings) => this.http.post<T.BusinessSettings>(`${this.t}/settings/business/update`, d),
+    set:            (d: T.SetSettingRequest)      => this.http.post(`${this.t}/settings/set`, d),
+    delete:         (key: string)                 => this.http.post(`${this.t}/settings/${key}/delete`, {}),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // users (store staff / members)
+  // users (tenant members / staff) — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly users = {
-    list:          ()                             => this.http.get<T.User[]>(`${this.s}/users`),
-    invite:        (d: T.InviteUserRequest)       => this.http.post<T.User>(`${this.s}/users`, d),
-    getById:       (id: number)                   => this.http.get<T.User>(`${this.s}/users/${id}`),
-    update:        (id: number, d: T.UpdateUserRequest) => this.http.put<T.User>(`${this.s}/users/${id}`, d),
-    delete:        (id: number)                   => this.http.delete(`${this.s}/users/${id}`),
-    profile:       ()                             => this.http.get<T.UserProfile>(`${this.s}/users/profile`),
-    updateProfile: (d: T.UpdateProfileRequest)    => this.http.put<T.UserProfile>(`${this.s}/users/profile`, d),
+    list:          ()                             => this.http.get<T.User[]>(`${this.t}/users`),
+    get:           (id: number)                   => this.http.get<T.User>(`${this.t}/users/${id}`),
+    profile:       ()                             => this.http.get<T.UserProfile>(`${this.t}/users/profile`),
+    invite:        (d: T.InviteUserRequest)       => this.http.post<T.User>(`${this.t}/users/invite`, d),
+    update:        (id: number, d: T.UpdateUserRequest) => this.http.post<T.User>(`${this.t}/users/${id}/update`, d),
+    delete:        (id: number)                   => this.http.post(`${this.t}/users/${id}/delete`, {}),
+    updateProfile: (d: T.UpdateProfileRequest)    => this.http.post<T.UserProfile>(`${this.t}/users/profile/update`, d),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // onboarding
+  // onboarding — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly onboarding = {
-    status:        ()                             => this.http.get(`${this.s}/onboarding/status`),
-    medicineCategories: ()                        => this.http.get(`${this.s}/onboarding/medicines/categories`),
-    searchMedicines:(p: T.SearchMedicinesParams)  => this.http.get(`${this.s}/onboarding/medicines`, p),
-    bulkCreate:    (d: T.OnboardingBulkCreateRequest) => this.http.post(`${this.s}/onboarding/bulk-create`, d),
-    establishment: (d: T.OnboardingEstablishmentRequest) => this.http.post(`${this.s}/onboarding/establishment`, d),
+    status:              ()                       => this.http.get(`${this.t}/onboarding/status`),
+    medicineCategories:  ()                       => this.http.get(`${this.t}/onboarding/medicines/categories`),
+    searchMedicines:     (p: T.SearchMedicinesParams) => this.http.get(`${this.t}/onboarding/medicines/search`, p),
+    bulkCreate:          (d: T.OnboardingBulkCreateRequest) => this.http.post(`${this.t}/onboarding/bulk-create`, d),
+    saveEstablishment:   (d: T.OnboardingEstablishmentRequest) => this.http.post(`${this.t}/onboarding/establishment/save`, d),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // stockReconciliation
+  // stockReconciliation — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly stockReconciliation = {
-    list:          ()                             => this.http.get<T.StockReconciliationListResponse>(`${this.s}/stock-reconciliation`),
-    create:        (d: T.CreateStockReconciliationRequest) => this.http.post(`${this.s}/stock-reconciliation`, d),
-    getById:       (id: number)                   => this.http.get(`${this.s}/stock-reconciliation/${id}`),
-    update:        (id: number, d: T.UpdateStockReconciliationRequest) => this.http.put(`${this.s}/stock-reconciliation/${id}`, d),
-    delete:        (id: number)                   => this.http.delete(`${this.s}/stock-reconciliation/${id}`),
-    summary:       (id: number)                   => this.http.get(`${this.s}/stock-reconciliation/${id}/summary`),
-    start:         (id: number)                   => this.http.post(`${this.s}/stock-reconciliation/${id}/start`, {}),
-    approve:       (id: number)                   => this.http.post(`${this.s}/stock-reconciliation/${id}/approve`, {}),
-    complete:      (id: number)                   => this.http.post(`${this.s}/stock-reconciliation/${id}/complete`, {}),
+    list:     ()                                  => this.http.get<T.StockReconciliationListResponse>(`${this.t}/stock-reconciliation`),
+    get:      (id: number)                        => this.http.get(`${this.t}/stock-reconciliation/${id}`),
+    summary:  (id: number)                        => this.http.get(`${this.t}/stock-reconciliation/${id}/summary`),
+    create:   (d: T.CreateStockReconciliationRequest) => this.http.post(`${this.t}/stock-reconciliation/create`, d),
+    update:   (id: number, d: T.UpdateStockReconciliationRequest) => this.http.post(`${this.t}/stock-reconciliation/${id}/update`, d),
+    delete:   (id: number)                        => this.http.post(`${this.t}/stock-reconciliation/${id}/delete`, {}),
+    start:    (id: number)                        => this.http.post(`${this.t}/stock-reconciliation/${id}/start`, {}),
+    approve:  (id: number)                        => this.http.post(`${this.t}/stock-reconciliation/${id}/approve`, {}),
+    complete: (id: number)                        => this.http.post(`${this.t}/stock-reconciliation/${id}/complete`, {}),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // payments
+  // payments — tenant context required
   // ─────────────────────────────────────────────────────────────
   readonly payments = {
-    list:          ()                             => this.http.get(`${this.s}/payments`),
-    create:        (d: T.CreatePaymentRequest)    => this.http.post(`${this.s}/payments`, d),
-    getById:       (id: number)                   => this.http.get(`${this.s}/payments/${id}`),
-    update:        (id: number, d: T.UpdatePaymentRequest) => this.http.put(`${this.s}/payments/${id}`, d),
-    delete:        (id: number)                   => this.http.delete(`${this.s}/payments/${id}`),
-    byReference:   (type: string, id: number)     => this.http.get(`${this.s}/payments/reference/${type}/${id}`),
+    list:         ()                              => this.http.get(`${this.t}/payments`),
+    get:          (id: number)                    => this.http.get(`${this.t}/payments/${id}`),
+    byReference:  (type: string, id: number)      => this.http.get(`${this.t}/payments/by-reference/${type}/${id}`),
+    create:       (d: T.CreatePaymentRequest)     => this.http.post(`${this.t}/payments/create`, d),
+    update:       (id: number, d: T.UpdatePaymentRequest) => this.http.post(`${this.t}/payments/${id}/update`, d),
+    delete:       (id: number)                    => this.http.post(`${this.t}/payments/${id}/delete`, {}),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // subscription (cross-cutting — no storeId in URL, uses auth token)
+  // subscription — no tenant scope (uses identity JWT, cross-cutting)
   // ─────────────────────────────────────────────────────────────
   readonly subscription = {
     status:        ()                             => this.http.get('/subscription/status'),
     plans:         ()                             => this.http.get('/subscription/plans'),
-    createOrder:   (d: T.CreateOrderRequest)      => this.http.post('/subscription/create-order', d),
-    verifyPayment: (d: T.VerifyPaymentRequest)    => this.http.post('/subscription/verify-payment', d),
+    createOrder:   (d: T.CreateOrderRequest)      => this.http.post('/subscription/orders/create', d),
+    verifyPayment: (d: T.VerifyPaymentRequest)    => this.http.post('/subscription/payments/verify', d),
   };
 
   // ─────────────────────────────────────────────────────────────
-  // utility (dropdown data, states — shared lookups)
+  // lookup — shared dropdown/reference data (tenant context required)
   // ─────────────────────────────────────────────────────────────
-  readonly utility = {
-    dropdownData:  (table: string, field: string, p?: Record<string, string>) =>
-                     this.http.get(`${this.s}/dropdown-data/${table}/${field}`, p),
-    states:        ()                             => this.http.get('/portal/states'),
-    medicines:     (q: string)                    => this.http.get(`${this.s}/medicines/search`, { q }),
+  readonly lookup = {
+    dropdown: (table: string, field: string, p?: HttpParams) =>
+                this.http.get(`${this.t}/lookup/dropdown/${table}/${field}`, p),
+    states:   ()                                  => this.http.get(`/portal/lookup/states`),
   };
 }
 ```
@@ -555,113 +703,145 @@ export class ApiClient {
 
 ## 8. URL Route Convention
 
-### Current (problematic)
+### Agreed convention (§0 B1)
 
 ```
-GET  /stores/{storeId}/portal/inventory/items
-POST /stores/{storeId}/portal/billing/bills
-GET  /api/auth/my-tenants
+/{service}/tenant/{tenantId}/{group}/{action}[/{id}]
 ```
 
-`stores/{storeId}` precedes the service discriminator (`portal`). The API router must read the path deeply before knowing which service context it is in.
-
-### Proposed
+Examples:
 
 ```
-GET  /portal/store/{storeId}/inventory/items
-POST /portal/store/{storeId}/billing/bills
-GET  /api/auth/my-tenants
+GET  /portal/tenant/42/items                          → inventory.list()
+GET  /portal/tenant/42/items/123                      → inventory.get(123)
+GET  /portal/tenant/42/items/search?q=amox            → inventory.search({q:'amox'})
+POST /portal/tenant/42/items/create                   → inventory.create(data)
+POST /portal/tenant/42/items/123/update               → inventory.update(123, data)
+POST /portal/tenant/42/items/123/delete               → inventory.delete(123)
+POST /portal/tenant/42/items/123/adjust               → inventory.adjust(123, data)
+GET  /portal/tenant/42/reports/sales/daily            → reports.salesDaily()
+GET  /subscription/status                             → subscription.status()   (no tenant)
+GET  /public/medicines/search?q=amox                  → (no auth, no tenant)
 ```
 
 **Hierarchy:**
 
 ```
-/{service}/{storeId-scope?}/{module}/{resource}
-
-/portal/store/42/inventory/items    → portal service, store 42, inventory module
-/admin/inventory/items              → admin service (no store scope — admin sees all)
-/api/auth/login                     → auth service (platform-wide, no store)
-/public/medicines/search            → public service (no auth)
+/{service}          — router's first split: portal | admin | public | api
+  /tenant/{id}      — T3 only: framework middleware extracts id, validates membership (AUTH-SPEC §5c)
+    /{group}        — declared concept group (inventory, billing, reports, …)
+      /{action}     — declared action verb (create, update, delete, search, …)
+        [/{id}]     — optional path parameter for a specific resource
 ```
 
-**Why this order:**
+**Why service-first:**
+The PHP router's first decision is which handler group owns the request. Putting service last (old pattern: `/stores/{storeId}/portal/…`) meant parsing a variable-length tenant segment before knowing the service context. Service-first allows early-return routing.
 
-1. **Service first** (`portal`, `admin`, `public`, `api`) — the API router's first decision is which handler group owns this request. Early return on wrong service.
-2. **Tenant scope second** (`store/{storeId}`) — within portal context, scope to a specific store. The PHP router extracts `storeId` here and passes it to the gateway as the tenant context.
-3. **Module third** (`inventory`, `billing`, etc.) — functional grouping within the service+tenant.
-4. **Resource last** (`items`, `bills`, `items/{id}`) — specific resource or sub-resource.
+**Why `tenant` not `store`/`warehouse`/`workspace`:**
+AUTH-SPEC, the gateway, and the DB all use `tenant_id`. The URL must match the vocabulary of the authorization layer.
 
-### PHP route definition pattern
+**Why GET + POST only (B2):**
+PUT and DELETE are aliases for "update" and "remove" — but those are already said by the action word in the URL. Removing HTTP verb semantics collapses synonym drift: teams no longer debate "should this be PUT or PATCH?" The action name is the contract.
+
+**PHP route definition pattern:**
 
 ```php
 // routes.php
 
-// Portal routes — store-scoped
-$router->group('/portal/store/{storeId}', function() {
-    $router->get('/inventory/items',           ListInventoryRoute::class);
-    $router->post('/inventory/items',          CreateItemRoute::class);
-    $router->put('/inventory/item/{id}',       UpdateItemRoute::class);
-    $router->delete('/inventory/item/{id}',    DeleteItemRoute::class);
-    $router->post('/billing/bills',            CreateBillRoute::class);
+// T3 portal routes — tenant-scoped
+$router->group('/portal/tenant/{tenantId}', ['middleware' => 'tenant-access'], function() {
+    // inventory group — declared, not inferred
+    $router->get('/items',                 ListItemsRoute::class,         group: 'inventory');
+    $router->get('/items/{id}',            GetItemRoute::class,           group: 'inventory');
+    $router->get('/items/search',          SearchItemsRoute::class,       group: 'inventory');
+    $router->post('/items/create',         CreateItemRoute::class,        group: 'inventory');
+    $router->post('/items/{id}/update',    UpdateItemRoute::class,        group: 'inventory');
+    $router->post('/items/{id}/delete',    DeleteItemRoute::class,        group: 'inventory');
+    $router->post('/items/{id}/adjust',    AdjustItemRoute::class,        group: 'inventory');
+
+    // billing group
+    $router->get('/bills',                 ListBillsRoute::class,         group: 'billing');
+    $router->post('/bills/create',         CreateBillRoute::class,        group: 'billing');
     // ...
 });
 
-// Auth routes — no store scope
-$router->group('/api/auth', function() {
-    $router->post('/login',                    AuthLoginRoute::class);
-    $router->get('/my-tenants',               GetMyTenantsRoute::class);
+// Subscription — no tenant scope
+$router->group('/subscription', function() {
+    $router->get('/status',                SubscriptionStatusRoute::class, group: 'subscription');
+    $router->post('/orders/create',        CreateOrderRoute::class,        group: 'subscription');
     // ...
 });
 ```
 
-The `{storeId}` path parameter is extracted by the router and made available to every portal route handler as `$this->storeId` — injected by the framework, not read from the request body.
+The `group:` parameter is the grouping declaration (B3). The generator reads it — it does not infer the group from path segments.
+
+The `{tenantId}` path parameter is extracted by the framework middleware, validated against the identity's memberships (AUTH-SPEC §5c), and injected into every route handler — not read from the request body.
 
 ---
 
-## 9. Tenant Scoping — setStore()
+## 9. Tenant Scoping — setTenant()
+
+**T3 platforms (Multi-Tenant/URL: medstoreapp, logisticsapp, restrantapp, instituteapp):**
 
 ```typescript
-// Consumer code (Angular component or any JS)
+// Consumer code (Angular component, or any JS)
 
 const api = new ApiClient('https://api.medstoreapp.in');
 
-// After OTP login:
-const tenants = await api.auth.myTenants();
-await api.auth.selectTenant({ tenant_id: tenants[0].id });
+// Step 1 — authenticate (handled by auth-client, not the business client):
+// api.tokens.set(accessToken);   // auth-client sets the token after login
 
-// After tenant selection — set context once:
-api.setStore(tenants[0].id);
+// Step 2 — set tenant context once after tenant selection:
+api.setTenant(tenantId);  // e.g. setTenant(42)
 
-// All subsequent portal calls use store context silently:
-const items    = await api.inventory.list();          // GET /portal/store/42/inventory/items
-const bill     = await api.billing.create(billData);  // POST /portal/store/42/billing/bills
-const dashboard= await api.dashboard.summary();       // GET /portal/store/42/dashboard
+// Step 3 — all tenant-scoped calls use that context silently:
+const items    = await api.inventory.list();         // GET /portal/tenant/42/items
+const bill     = await api.billing.create(billData); // POST /portal/tenant/42/bills/create
+const dashboard= await api.dashboard.summary();      // GET /portal/tenant/42/dashboard
 ```
 
-No storeId in any call signature after `setStore()`. The Angular library calls `api.setStore(id)` inside its `AuthService.selectTenant()` method — the Angular developer never touches it directly.
+No `tenantId` in any call signature after `setTenant()`. The Angular library calls `api.setTenant(id)` inside its `AuthService.selectTenant()` method — the Angular developer never touches it directly.
 
-**Edge case:** If a portal method is called before `setStore()`, `ApiClient` throws synchronously:
+**`setTenant()` is re-callable.** A user switching between tenants in the same session calls `setTenant(newId)` without a page reload. Single-active-context constraint: this instance tracks one tenant at a time. For genuine simultaneous multi-tenant access (e.g. admin comparing two tenants), create separate `ApiClient` instances.
+
+**Early-error if called before `setTenant()`:**
 
 ```
-Error: [ApiClient] Store context not set. Call setStore(id) after tenant selection.
+Error: [ApiClient] Tenant context not set. Call setTenant(id) after tenant selection.
 ```
 
-This is a programming error, not a runtime error — caught immediately in development.
+This is a programming error — caught immediately in development, never reaches production.
+
+**T2 platforms (webmeteor):**
+
+No `setTenant()`. The tenant is encoded in the platform JWT obtained via the auth exchange route. The generated `ApiClient` for T2 has no `t` getter and no `/tenant/{id}` prefix in any URL.
+
+**T1 platforms (single-tenant):**
+
+No `setTenant()`. No tenant scope. All routes are at `/{service}/{group}/{action}`.
 
 ---
 
 ## 10. Request / Response Contract
 
-The generated DTOs mirror the PHP DTO classes. The generator reads `src/App/DTO/*.php` and emits TypeScript interfaces.
+The generated DTOs mirror the PHP DTO classes. The generator reads `src/App/DTO/*.php` and emits TypeScript interfaces in `src/types.ts`.
 
-All API responses follow the StoneScriptPHP envelope:
+**Business client envelope (builtin — B5):**
 
 ```json
-{ "status": "ok", "message": "", "data": { ... } }
-{ "status": "error", "message": "Human-readable error", "data": null }
+{ "status": "ok",    "message": "",              "data": { ... } }
+{ "status": "error", "message": "Human-readable", "data": { "error": "MACHINE_CODE", ... } }
 ```
 
-`MinimalHttp` unwraps this envelope. Callers receive `data` directly on success and an `ApiError` on failure. Callers never see the envelope.
+`MinimalHttp` unwraps this envelope automatically:
+- `status === "ok"` → returns `data` verbatim (including `null`).
+- `status !== "ok"` → throws `ApiError` with `message`, `httpStatus`, and `code` (`data.error`).
+
+Callers never see the envelope wrapper. They receive the payload directly on success, and a typed `ApiError` on failure.
+
+**Auth-client envelope (external — handled by auth-client, not MinimalHttp):**
+
+The `progalaxyelabs-auth` daemon uses a different envelope shape (`{success,...}`). That normalization is the auth-client's responsibility (AUTH-SPEC §P5). `MinimalHttp` in the business client does not handle it — they are separate concerns.
 
 ---
 
@@ -669,94 +849,120 @@ All API responses follow the StoneScriptPHP envelope:
 
 ```typescript
 // Consumer code
+import { ApiError } from '@stonescript/api-client';
+
 try {
   const bill = await api.billing.create(billData);
-  // bill is the unwrapped data object
+  // bill is the unwrapped data payload
 } catch (e) {
   if (e instanceof ApiError) {
-    console.error(e.message);       // "Item out of stock"
-    console.error(e.httpStatus);    // 200 (StoneScriptPHP error envelope) or 400/401/503
-    console.error(e.response);      // full response body for debugging
+    console.error(e.message);     // "Item out of stock" (human-readable from API)
+    console.error(e.code);        // "ITEM_OUT_OF_STOCK" (machine code from data.error — may be null)
+    console.error(e.httpStatus);  // 200 (StoneScriptPHP error in envelope) or 401/503 (transport)
+    console.error(e.response);    // full response body (for debugging)
   }
 }
 ```
 
-The Angular library (`ngx-stonescriptphp-client`) catches `ApiError` at a higher level and maps it to user-facing messages, toasts, or retry prompts. The generated client does not depend on any UI framework to do this.
+**`ApiError` class (emitted verbatim in `src/errors.ts`):**
+
+```typescript
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly httpStatus: number,
+    public readonly response: unknown,
+    public readonly code: string | null,    // data.error from envelope — null if absent
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+```
+
+The Angular library (`ngx-stonescriptphp-client`) catches `ApiError` globally and maps `code` to user-facing toasts, retry prompts, or redirect actions. The generated client does not depend on any UI framework to do this.
 
 ---
 
 ## 12. ngx-stonescriptphp-client — Angular Wrapper Role
 
-After this redesign, the Angular library's responsibility shrinks significantly and becomes clearly defined:
+After this redesign, the Angular library's responsibility shrinks and becomes clearly bounded:
 
 **Keeps:**
-- `provideNgxStoneScriptPhpClient(apiUrl)` — constructs `ApiClient`, registers it in Angular DI
-- `AuthService` — wraps `api.auth.*` calls, manages `isAuthenticated` and `currentUser` signals, calls `api.setStore(id)` after tenant selection
-- Route guards (`authGuard`, `tenantGuard`)
-- `<lib-tenant-login>` component — the login/OTP/OAuth UI
-- Error handler — catches `ApiError`, maps to user-facing toast/alert
-- Loading state directives (optional)
+- `provideNgxStoneScriptPhpClient(apiUrl)` — constructs `ApiClient(apiUrl)`, registers it in Angular DI
+- `AuthService` — mediates between auth-client and the business client:
+  - calls `auth-client.login()` / `auth-client.selectTenant()` to handle auth flow
+  - calls `api.setTenant(id)` after tenant selection (T3 platforms)
+  - exposes `isAuthenticated` signal, `currentUser` signal, `currentTenant` signal
+- Route guards (`authGuard`, `tenantSelectedGuard`)
+- `<lib-tenant-login>` component — the login/OTP/OAuth UI shell
+- Global error handler — catches `ApiError`, maps `code` to user-facing alert/toast
+- Loading state directives (optional, additive)
 
 **Removes:**
-- `ApiConnectionService` — no longer needed; `MinimalHttp` replaces it
-- Token management code — lives in generated `TokenStore`
-- HTTP interceptors — `MinimalHttp` handles auth headers and refresh
+- `ApiConnectionService` — replaced by `MinimalHttp` inside the generated client
+- Token management code — lives in the generated `TokenStore`
+- HTTP interceptors for auth headers / refresh — `MinimalHttp` handles both
 - Storage strategy configuration — frozen in `TokenStore`
 
-**The test:** if you can describe what `ngx-stonescriptphp-client` does without mentioning HTTP, tokens, or URL paths — the boundary is correct.
+**Relationship to auth-client:**
+
+`ngx-stonescriptphp-client` depends on `stonescriptphp-auth-client` (the contract interface). It adapts the auth-client's events (login success, token refresh) into Angular signals and DI calls (`api.setTenant()`). It does NOT implement auth HTTP directly.
+
+**The boundary test:** if you can describe what `ngx-stonescriptphp-client` does without mentioning HTTP requests, token storage, or URL strings — the boundary is correct.
 
 ---
 
 ## 13. Migration Path
 
-### Phase 1 — Generator (framework change)
+**Phasing decision (§0 OQ5): big-bang.** No customers to protect, so generator self-containment + URL restructure + all 11 platforms migrate in one coordinated sweep. No dual-convention period. Each platform must clear factory QC + the CI build-gate (un-gitignored `dist/`) before it deploys — nothing half-migrates, nothing ships un-revalidated.
 
-1. Update `php stone generate client` to emit `MinimalHttp`, `TokenStore`, `ApiError` verbatim into every generated package.
-2. Update the grouping logic: group by functional module path segment, not by business entity.
-3. Add `setStore(id)` to `ApiClient`.
-4. Remove the `ngx-stonescriptphp-client` dependency from the generated `package.json`.
-5. Update all generated method names to follow `module.verb(params)` convention (no `Portal` prefix, no HTTP verb prefix).
+### Phase 1 — AUTH-SPEC amendments
 
-### Phase 2 — URL restructure (all platforms)
+1. Apply the pending-amendment note in AUTH-SPEC §T: update §T, §5c, and the §S1 path-prefix table from `/stores/:storeId/portal/…` to `/{service}/tenant/{tenantId}/…`.
+2. AUTH-SPEC is the single source of truth — this client spec defers to it.
 
-1. Update PHP route definitions from `/stores/{storeId}/portal/*` to `/portal/store/{storeId}/*`.
-2. Regenerate clients for all 11 platforms.
-3. Update nginx routing if the service prefix (`/portal`, `/admin`) is handled at the nginx level rather than in PHP.
+### Phase 2 — Contract validation (process gate from §0)
 
-### Phase 3 — Angular library slim-down
+Validate the `/{service}/tenant/{tenantId}/{group}/{action}` convention against ≥2 non-medstoreapp platforms before implementation:
+
+- **logisticsapp (T3):** routes involve warehouses, shipments, routes — verify group names fit the convention cleanly and don't collide with `tenant/` vocabulary.
+- **webmeteor (T2):** no URL tenant — verify the T2 generated client shape (no `setTenant`, no `/tenant/{id}` segment) is coherent and the auth exchange flow maps correctly.
+- **An admin surface:** admin has no tenant scope — verify the separate admin client approach (§0 OQ3) is clean.
+
+This gate exists because a contract proven only on its drafting platform ships journey-seam bugs.
+
+### Phase 3 — Generator (framework change)
+
+1. Update `php stone generate client` to emit `MinimalHttp`, `TokenStore`, `ApiError` verbatim.
+2. Implement declared `group:` on route definitions; generator reads declarations, never infers from paths.
+3. Generate `setTenant(id)` on T3 clients; omit on T2 and T1.
+4. Remove `ngx-stonescriptphp-client` dependency from generated `package.json`.
+5. Generate only `get` and `post` calls in `ApiClient` — no `put` or `delete`.
+6. Un-gitignore `dist/` in generated `.gitignore`; add CI build-gate step.
+7. Split `stonescriptphp-auth-client` into contract interface + builtin impl (see B4).
+
+### Phase 4 — Route restructure (all 11 platforms)
+
+1. Update PHP route definitions from old convention to `/{service}/tenant/{tenantId}/{group}/{action}[/{id}]`.
+2. Add `group:` declarations to each route.
+3. Change all write routes from PUT/DELETE to POST with explicit action verbs.
+4. Run `php stone generate client` → commit new `src/` + `dist/`.
+
+### Phase 5 — Angular library slim-down
 
 1. Remove `ApiConnectionService` from `ngx-stonescriptphp-client`.
-2. Remove token management code.
-3. Update `provideNgxStoneScriptPhpClient` to accept `apiUrl: string` instead of a connection config object — it constructs `ApiClient(apiUrl)` internally.
-4. Update `AuthService` to call `api.setStore(id)` after tenant selection.
-5. Remove storage strategy options from `provideNgxStoneScriptPhpClient` config.
+2. Remove token management and HTTP interceptor code.
+3. Update `provideNgxStoneScriptPhpClient(apiUrl: string)` — constructs `ApiClient(apiUrl)` internally.
+4. Update `AuthService` to call `api.setTenant(id)` after tenant selection (T3).
+5. Wire auth-client contract into `AuthService` (replaces direct auth API calls).
 
-### Phase 4 — Platform updates (all 11)
+### Phase 6 — Platform updates (all 11)
 
-1. Remove `ApiClientService` hand-written wrappers from all platforms.
-2. Components inject `ApiClient` directly (via Angular DI) and call `api.inventory.list()` etc.
-3. Or: thin platform-specific service that wraps `ApiClient` for business logic (grouping, caching) — not for URL mapping.
-
-### Short-term (unblock medstoreapp QC)
-
-Revert medstoreapp URL structure to `/portal/*` (no storeId in path), re-run `php stone generate client` with the old generator so the old grouped interface comes back, medstoreapp portal compiles. Run QC. Then do phases 1–4 as framework work.
+1. Remove hand-written `ApiClientService` wrappers from all platforms.
+2. Update Angular components: inject `ApiClient` via DI, call `api.{group}.{action}()` directly.
+3. Run factory QC + build-gate on each platform before it deploys.
 
 ---
 
-## 14. Open Questions
-
-1. **SSR / Server-side rendering**: `TokenStore` uses `localStorage` which is not available in Node.js. Should `TokenStore` emit an SSR guard (`typeof localStorage !== 'undefined'`), or is SSR out of scope for StoneScriptPHP platforms?
-
-2. **Multiple stores**: Can a user switch stores without a page reload? If yes, `setStore(id)` must be callable multiple times. Is this the intended UX or does store switching always trigger a full reload?
-
-3. **Admin service**: Admin routes don't have a storeId scope. Should `ApiClient` have a separate `admin.*` module group without the `this.s` prefix, or is admin a separate generated client entirely?
-
-4. **Offline / PWA**: Some platforms (medstoreapp portal-offline) need offline support. Does the frozen `TokenStore` (localStorage) conflict with PWA service worker strategies? Or is offline handled at the PWA layer independently of the client?
-
-5. **Generator phasing**: Should Phase 1 (generator) and Phase 2 (URL restructure) ship together (one breaking change across all platforms) or separately (generator change that preserves old URL structure, then URL restructure separately)?
-
-6. **`ngx-stonescriptphp-pay`**: The payment library currently depends on `ApiConnectionService`. After this redesign it should depend on `ApiClient` directly. Does this change the `ngx-stonescriptphp-pay` API surface?
-
----
-
-*This spec is a design proposal. Implementation begins after review sign-off.*
+*This spec is approved at the decision level. Implementation begins after Phase 2 validation sign-off.*
