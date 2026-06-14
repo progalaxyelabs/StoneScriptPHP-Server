@@ -92,7 +92,8 @@ regenerate once, fix forward.
 ### Open-question dispositions
 1. **SSR** → out of scope. 2. **Multi-tenant switching** → T3 supports simultaneous tabs via tab-local
 URL (§T); `setTenant` re-callable; document the single-active-context constraint. 3. **Admin** →
-separate generated client (no tenant scope). 4. **Offline/PWA** → localStorage for tokens; offline data
+**CLOSED (see A6 below):** separate generated client, identity-scoped, no `/tenant/{id}` segment,
+partitioned by `service` marker on the route. 4. **Offline/PWA** → localStorage for tokens; offline data
 is a PWA-layer concern. 5. **Phasing** → **big-bang (decided 2026-06-14)** — no customers to protect, so generator
 self-containment + URL restructure + all 11 platforms migrate in **one coordinated sweep**, no
 dual-convention period. Guardrail: every platform still passes **factory QC + the un-gitignored-dist
@@ -100,14 +101,297 @@ build-gate before any deploy** — the contract changes all at once, but no plat
 none deploys un-revalidated. 6. **ngx-pay** → depends on `ApiClient`; align with the new
 `stonescriptphp-pay` design.
 
+---
+
+### Amendments (2026-06-14) — contract validation against logisticsapp + webmeteor
+
+Six decisions surfaced during the ≥2-platform process gate. All are **resolved and binding**;
+§§1–14 are to be updated to match. Amendments are numbered A1–A6.
+
+#### A1 — Streaming / SSE endpoints are EXCLUDED from the generated business client
+
+**Trigger:** webmeteor `GET /api/workspaces/:id/events` — Server-Sent Events
+(`text/event-stream`); the build-event stream cannot be modelled as a Promise-returning
+method.
+
+**Decision:** Routes annotated `streaming: true` (see A2 for the declaration mechanism)
+are **excluded from `php stone generate client` entirely**. They do not appear in the
+generated `ApiClient`. The generator logs a notice when it skips a streaming route so
+the omission is visible.
+
+**How the caller consumes streaming endpoints:** via a hand-written `EventSource` wrapper
+(or `fetch` with `ReadableStream`) authored once per platform and placed **outside** the
+generated client package (e.g. `docker/api/client/{service}/streaming/events.ts`). The
+generated package contains a comment block naming every excluded streaming route and
+pointing to this convention so developers know where to look.
+
+**What is NOT streaming:** a route that returns a large JSON payload, a long-poll
+endpoint, or a paginated list is **not** streaming — it is a normal GET route. The
+`streaming: true` annotation is reserved for `text/event-stream` / `Transfer-Encoding:
+chunked` / WebSocket upgrade routes only.
+
+**Auth on streaming routes:** the caller is responsible for forwarding the Authorization
+header (or query param token where EventSource does not support custom headers). The
+generated client's `TokenStore` is exported so streaming helpers can read the token via
+`api.tokens.get()`.
+
+**Cross-reference:** §5 (MinimalHttp only implements GET+POST, no streaming), §7 (ApiClient
+generated methods).
+
+---
+
+#### A2 — Group-declaration syntax in routes.php (EXACT mechanism)
+
+**Trigger:** §0 says "group is declared on the route, never inferred" but gives no PHP
+syntax. Both validated platforms currently declare `scope` (portal / admin / shared infra
+bucket), not `group` (domain concept). These are different dimensions and must not be
+conflated.
+
+**Terms clarified:**
+- **`service`** — the first URL segment and the PHP router's top-level handler split
+  (`portal`, `admin`, `public`, `api`). Unchanged from existing framework usage; this is
+  what platforms currently call `scope`. The existing `scope` parameter on `$router->group()`
+  is **renamed `service`** in the new convention to eliminate the ambiguity.
+- **`group`** — the domain-concept grouping for the generated client (`inventory`, `billing`,
+  `routes`, `workspaces`). This is a NEW required named parameter on individual route
+  definitions.
+- **`action`** — the explicit verb for the generated method name. When the URL already
+  encodes a clear action and no alias is needed, the generator derives it from the last
+  non-id URL segment (kebab→camel). When the URL action word would produce a misleading
+  method name, the route may declare an explicit `action:` override. The `action` parameter
+  is optional; `group` is mandatory.
+- **`streaming`** — boolean, optional, default `false`. When `true` the generator skips
+  the route (see A1).
+
+**Exact route definition syntax (before / after):**
+
+```php
+// BEFORE (current — scope conflated with service, no group)
+$router->group('/portal/tenant/{tenantId}', ['middleware' => 'tenant-access', 'scope' => 'portal'], function() {
+    $router->get('/items',              ListItemsRoute::class);
+    $router->get('/items/{id}',         GetItemRoute::class);
+    $router->post('/items/create',      CreateItemRoute::class);
+});
+
+// AFTER (new — service declared on group, group+action+streaming on each route)
+$router->group('/portal/tenant/{tenantId}', ['middleware' => 'tenant-access', 'service' => 'portal'], function() {
+    $router->get('/items',              ListItemsRoute::class,      group: 'inventory');
+    $router->get('/items/{id}',         GetItemRoute::class,        group: 'inventory');
+    $router->post('/items/create',      CreateItemRoute::class,     group: 'inventory');
+    $router->post('/items/{id}/update', UpdateItemRoute::class,     group: 'inventory');
+    // streaming route — generator skips, emits notice
+    $router->get('/workspaces/{id}/events', WorkspaceEventsRoute::class, group: 'workspaces', streaming: true);
+});
+```
+
+**If `group` is absent on a route definition, the generator MUST emit a hard error and
+abort.** It does NOT fall back to inferring the group from path segments. This is the
+lesson from the v3.30 breakage: silent inference produces a different client shape on every
+regen and ships broken consumers. Hard error + fix-the-declaration is the only safe path.
+
+**Generator error format:**
+```
+[stone generate client] ERROR: Route GET /portal/tenant/{tenantId}/items has no `group` declaration.
+Add group: '<concept>' to the route definition. Generation aborted.
+```
+
+**Cross-reference:** §8 (URL route convention and PHP route definition pattern — update
+the example there to use the new `service` / `group` parameters), §7 (grouping table).
+
+---
+
+#### A3 — Non-tenant route homes: health, JWKS, root, and public inbound webhooks
+
+**Trigger:** Several route categories are not tenant-scoped and several are direction-reversed
+(server ← external caller, often API-key authenticated rather than JWT): health checks,
+JWKS discovery, home/root, and public inbound webhooks such as Razorpay payment callbacks
+(`POST /payments/webhook`) and job-queue callbacks (`POST /jobs/callback`).
+
+**Decision:** All of the following are **EXCLUDED from the generated business client**,
+consistently with the existing exclusion of `/api/internal/*` and auth routes (B4):
+
+| Route category | Example | Reason for exclusion |
+|---|---|---|
+| Health check | `GET /health` | Infrastructure probe, no business logic |
+| JWKS discovery | `GET /.well-known/jwks.json` | Auth infrastructure, handled by auth-client |
+| Root / home | `GET /` | Not a business API endpoint |
+| Public inbound webhooks | `POST /payments/webhook`, `POST /jobs/callback` | Direction-reversed; called BY external systems, not BY the client |
+
+**No "public/integration" group is introduced.** A grouping in the generated client implies
+a caller-invoked method. Direction-reversed routes (webhooks) are server-side receivers —
+adding them to the client API would be semantically wrong. Plain exclusion is the correct
+treatment.
+
+**How excluded routes are declared:**
+
+```php
+// Excluded from generation — declare service: 'infra' OR annotate exclude: true
+$router->get('/health',                  HealthRoute::class,          service: 'infra');
+$router->get('/.well-known/jwks.json',   JwksRoute::class,            service: 'infra');
+$router->post('/payments/webhook',       RazorpayWebhookRoute::class, service: 'webhook');
+$router->post('/jobs/callback',          JobCallbackRoute::class,     service: 'webhook');
+```
+
+The generator skips any route whose `service` is `infra` or `webhook`. If the route
+has no `service` and no `group`, the A2 hard-error rule applies (missing `group`). This
+means every route must have either a `group` (include) or a `service: 'infra'|'webhook'`
+(exclude) — nothing falls through silently.
+
+**Webhook security note (not a client-SDK concern, recorded here for completeness):**
+inbound webhooks MUST validate a provider signature (e.g. Razorpay `X-Razorpay-Signature`
+header) server-side. They are NOT JWT-authenticated. The route middleware for `service:
+'webhook'` routes MUST skip the standard JWT auth middleware.
+
+**Cross-reference:** B4 (auth routes excluded), §8 (hierarchy table — add `infra` and
+`webhook` as excluded service values), §13 Phase 4 (route restructure checklist — add
+webhook routes to the exclusion pass).
+
+---
+
+#### A4 — Sub-resource vs action vs cross-entity group: worked examples
+
+**Trigger:** Ambiguity about when a nested URL segment is an `{action}` on the parent
+group vs. deserving its own `group`. logisticsapp has `GET /portal/.../routes/:id/shipments`
+(shipments belonging to a route) alongside cross-entity `search`.
+
+**Rule (binding):** The `group` declaration on the route definition is the sole authority.
+Path segment depth is irrelevant. The question "is this a sub-resource or its own group?"
+is answered by the declaring developer — NOT inferred from path structure. The convention
+below guides the decision:
+
+| Pattern | Recommended grouping | Generated method | Rationale |
+|---|---|---|---|
+| `GET /routes/:id/shipments` | `group: 'routes'` | `routes.shipments(id)` | Shipments are a child view of a route; callers think "give me this route's shipments" |
+| `POST /routes/:id/assign-driver` | `group: 'routes'` | `routes.assignDriver(id, data)` | Action on a route resource; RPC-style verbs are valid actions |
+| `POST /routes/:id/start` | `group: 'routes'` | `routes.start(id)` | Same — state-transition action on a specific route |
+| `GET /shipments/search?q=...` | `group: 'shipments'` | `shipments.search(params)` | Shipment-scoped search; not cross-entity |
+| `GET /search?q=...&types=routes,shipments` | `group: 'search'` | `search.global(params)` | Genuine cross-entity search; own group per §0 search rule |
+| `GET /dashboard` | `group: 'dashboard'` | `dashboard.summary()` | Composed/cross-entity view; purpose group per §0 |
+
+**The sub-resource-as-action pattern** (`routes.shipments(id)`) is preferred when:
+- the nested resource only makes sense in the context of the parent (shipments of a
+  specific route), AND
+- the nested resource is not independently queryable without the parent ID.
+
+**The own-group pattern** (`shipments.*`) is used when:
+- the resource has standalone operations (create, list all, search) that don't require
+  a parent ID, OR
+- the route developer explicitly judges it a first-class domain concept.
+
+**RPC-style action verbs** (`start`, `stop`, `optimize`, `assign-driver`) are valid
+`{action}` values and produce valid generated method names (`routes.start(id)`,
+`routes.optimize(id, params)`). They are NOT a signal that the route needs its own group.
+
+**Cross-reference:** §0 URL & grouping convention (naming authority), §7 (grouping table),
+§8 (URL route convention).
+
+---
+
+#### A5 — Non-`:id` tail path parameters
+
+**Trigger:** Platforms use `:tracking_number`, `:slug`, `:package_id` instead of `:id`
+in the optional tail segment `[/{id}]`. The convention currently only names this param
+`{id}`.
+
+**Decision: platforms normalize tail path parameters to `:id`.** The alternative — allowing
+arbitrary param names and mapping each to a distinct generated method argument name —
+requires the generator to read semantic intent from param names and produces inconsistent
+method signatures across platforms (some `get(id)`, some `get(trackingNumber)`, some
+`get(slug)`). Normalization is the lower-churn option.
+
+**Rule:**
+- The tail path parameter in a route definition is always named `:id` in routes.php.
+- The generated method argument is always named `id` with type `string | number`.
+- The PHP route handler receives `id` from the path and maps it to its domain concept
+  internally (e.g. `$trackingNumber = $params['id']`). This mapping lives in the handler,
+  not in the URL contract.
+- **Exception for semantic clarity:** when a route handler is authored, the developer MAY
+  declare `param: 'tracking_number'` on the route definition to document the domain meaning.
+  The generator still emits `id` in the TypeScript method signature, but the PHP handler
+  receives the named param. This is documentation, not a behavior change.
+
+**Migration note (one-time):** existing routes using `:tracking_number`, `:slug`, etc.
+rename to `:id` during the Phase 4 route restructure sweep. No URL-breaking change is
+needed for routes already using `:id`.
+
+**Rationale:** Callers always know from context what the ID represents (they just fetched
+the entity). A typed DTO (`T.TrackingLookupResponse`) communicates the domain semantics
+more precisely than a parameter name.
+
+**Cross-reference:** §8 (URL route convention, `[/{id}]` segment), §7 (generated method
+signatures).
+
+---
+
+#### A6 — Admin client is a separate generated client (OQ3 CLOSED)
+
+**Trigger:** OQ3 was open: "Admin → separate generated client (no tenant scope)." Both
+validated platforms (logisticsapp admin, webmeteor admin) confirm admin routes exist
+alongside portal routes and have distinct access-control semantics.
+
+**Decision:**
+
+`php stone generate client` produces **two separate packages** per platform that has both
+surfaces:
+
+| Package | Directory | Tenant scope | Auth |
+|---|---|---|---|
+| Business (tenant) client | `docker/api/client/{service}/` | `setTenant()` on T3; JWT-baked on T2; none on T1 | Identity JWT + tenant membership |
+| Admin client | `docker/api/client/admin/` | None — admin acts on the entire platform | Identity JWT with admin role claim |
+
+**Partitioning mechanism — how routes are assigned to each package:**
+
+The `service` declared on the route definition (see A2) is the partition key:
+
+```php
+// Routes with service: 'portal' → business client package (docker/api/client/portal/)
+$router->group('/portal/tenant/{tenantId}', ['middleware' => 'tenant-access', 'service' => 'portal'], function() {
+    $router->get('/items', ListItemsRoute::class, group: 'inventory');
+    // ...
+});
+
+// Routes with service: 'admin' → admin client package (docker/api/client/admin/)
+$router->group('/admin', ['middleware' => 'admin-access', 'service' => 'admin'], function() {
+    $router->get('/tenants',            ListTenantsRoute::class,     group: 'tenants');
+    $router->get('/tenants/{id}',       GetTenantRoute::class,       group: 'tenants');
+    $router->post('/tenants/{id}/suspend', SuspendTenantRoute::class, group: 'tenants');
+    $router->get('/users',              ListUsersRoute::class,       group: 'users');
+    $router->get('/analytics/overview', OverviewRoute::class,        group: 'analytics');
+});
+```
+
+The generator runs once and emits one package per distinct `service` value that has
+at least one non-excluded route. `service: 'infra'` and `service: 'webhook'` routes (A3)
+are always excluded from all packages.
+
+**Admin client shape:** identical structure to the business client — `MinimalHttp`,
+`TokenStore`, `ApiError` verbatim; groups and methods generated from `group:` declarations;
+GET+POST only. The sole difference is the absence of `setTenant()` and the absence of any
+`/tenant/{id}` segment in generated URLs.
+
+**Angular consumption:** the admin Angular service (`docker/admin/`) references
+`"file:../api/client/admin"` in its `package.json`. It never imports the portal client.
+The portal Angular service (`docker/portal/`) references `"file:../api/client/portal"`.
+Packages are never cross-imported.
+
+**Platforms with a single surface** (e.g. a T1 platform with only a `public` service)
+emit a single package. The generator emits one package per non-excluded service; platforms
+without an admin surface emit zero admin packages.
+
+**Cross-reference:** §3 (architecture diagram — add admin client box), §4 (package
+structure — note the per-service directory), §7 (ApiClient — note that the admin client
+has no `setTenant()`), §9 (Tenant Scoping — note admin client has no tenant scope),
+§13 Phase 3 (generator update — emit one package per service).
+
+---
+
 ### Reconciliation required in AUTH-SPEC (single source of truth)
-§T, §5c, and the path-prefix table currently say `/stores/:storeId/portal/…`. The agreed convention is
-`/{service}/tenant/{tenantId}/{group}/{action}` (service-first, `tenant` not `store`). Apply that change
-**in AUTH-SPEC** (see the pending-amendment note in §T); this client spec defers to it.
+**RESOLVED 2026-06-14** — AUTH-SPEC §T has been amended. The `/{service}/tenant/{tenantId}/{group}/{action}`
+convention is now the authoritative record in AUTH-SPEC. This client spec defers to it.
 
 ### Process gate before sign-off
-Validate the convention against ≥2 non-medstoreapp platforms (logisticsapp `/tenant`+`/warehouses`,
-webmeteor T2, an admin surface) — a contract proven only on its drafting platform ships journey-seam bugs.
+**CLOSED 2026-06-14** — validated against logisticsapp (T3, mainstream) and webmeteor (T2 +
+streaming + RPC). Convention held; 6 gaps/ambiguities surfaced and resolved as A1–A6 above.
 
 ---
 
