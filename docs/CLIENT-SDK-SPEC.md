@@ -573,9 +573,9 @@ export class MinimalHttp {
   constructor(
     private readonly baseUrl: string,
     private readonly tokens: TokenStore,
-    // Refresh endpoint is pinned to the AUTH-SPEC token contract.
+    // Refresh endpoint pinned to AUTH-SPEC §4a: POST /api/auth/refresh.
     // Do not change without updating AUTH-SPEC §token-contract.
-    private readonly refreshEndpoint: string = '/api/auth/token/refresh',
+    private readonly refreshEndpoint: string = '/api/auth/refresh',
   ) {}
 
   async get<T = unknown>(path: string, params?: HttpParams): Promise<T> {
