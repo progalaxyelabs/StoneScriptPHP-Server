@@ -410,6 +410,7 @@ streaming + RPC). Convention held; 6 gaps/ambiguities surfaced and resolved as A
 11. [Error Handling](#11-error-handling)
 12. [ngx-stonescriptphp-client — Angular Wrapper Role](#12-ngx-stonescriptphp-client--angular-wrapper-role)
 13. [Migration Path](#13-migration-path)
+14. [Files & Binary I/O — separate service + client](#14-files--binary-io--separate-service--client-not-the-json-sdk)
 
 ---
 
@@ -751,6 +752,10 @@ export class TokenStore {
 - IndexedDB is async and overkill for a JWT string.
 - HttpOnly cookies require server-side session handling — a different auth model entirely.
 - An injectable storage adapter is deferred — the first real non-localStorage consumer triggers that work. Adding it later is backward-compatible (optional constructor arg defaulting to localStorage).
+
+**Single token authority (2026-06-15):** This `TokenStore` is the one token authority for the entire SDK family — the JSON `ApiClient`, the files client (`@progalaxyelabs/ngx-stonescriptphp-files-client`), and any streaming helper read the access token from **here**. No sibling client keeps its own token copy or accepts a hand-passed `token` argument; doing so re-introduces the `access_token` vs `ssp_access_token` drift bug. See §14.
+
+**Tokens are OPAQUE to the client (2026-06-15, AUTH-SPEC §S3a):** `TokenStore` stores, returns, and clears token *strings* — it MUST NOT expose any claim-reading or JWT-decode method, and clients MUST NOT decode tokens anywhere (no `decodeJwtPayload`, no `atob(token.split('.')[1])`, not even "unverified client-side" reads). A token is an opaque bearer credential; its internal shape is the server's private business and changes without notice. When the client needs identity/session facts (tenant selected?, role, onboarding state, user id/email, display name) it **asks the server** (`GET /api/auth/me` / `/api/auth/profile` / per-platform session+onboarding endpoints) and the server serves them in JSON. The client asks for what it needs; it does not introspect the credential. Any such decode in client code is a defect to remove (the old `client-core` `TokenService.decodeJwtPayload` is deprecated — drop it).
 
 ---
 
@@ -1246,6 +1251,39 @@ This gate exists because a contract proven only on its drafting platform ships j
 1. Remove hand-written `ApiClientService` wrappers from all platforms.
 2. Update Angular components: inject `ApiClient` via DI, call `api.{group}.{action}()` directly.
 3. Run factory QC + build-gate on each platform before it deploys.
+
+### Phase 7 — Files & binary I/O alignment (first cross-package "in-sync" checkpoint)
+
+This phase precedes broad platform file migration. Its goal is a **proven, version-aligned trio**: the api-client generator, the `stonescriptphp-files` server, and the `ngx-stonescriptphp-files-client`, all consuming one token authority and E2E-green together.
+
+1. Update `@progalaxyelabs/ngx-stonescriptphp-files-client` to source the access token from the api-client's `TokenStore` (§6/§14) — remove the hand-passed `token` parameter from its public methods and share `MinimalHttp`'s 401→refresh→retry behavior (delegate, don't duplicate).
+2. Confirm `@progalaxyelabs/stonescriptphp-files` (server) JWT verification matches the api-client token contract (same key / audience / `ssp_*` access token).
+3. **Pilot:** migrate medstoreapp portal file handling off raw `fetch` onto `FilesService`. No raw `fetch`/manual `Bearer` left for file I/O.
+4. Verify all three are version-aligned and pass E2E together before any further platform adopts the files client.
+
+---
+
+## 14. Files & Binary I/O — separate service + client (NOT the JSON SDK)
+
+**Decision (Pradeep, 2026-06-15):** The generated business client (`ApiClient` / `MinimalHttp`) is **JSON-only**. It MUST NOT grow blob / FormData / binary or streaming methods. Binary file I/O is owned by a dedicated service + client; streaming is owned by hand-written helpers (§5 / A1). Three lanes, **one** token authority.
+
+### Three lanes
+| Concern | Owner | Token source |
+|---|---|---|
+| Business data (JSON in/out) | generated `ApiClient` (`MinimalHttp`) | `TokenStore` (§6) — **the authority** |
+| File upload / download / list / delete (binary) | `@progalaxyelabs/stonescriptphp-files` (Express + Azure Blob + JWT server) + `@progalaxyelabs/ngx-stonescriptphp-files-client` (`FilesService`) | reads the SAME token from `ApiClient.tokens` (§6) |
+| Streaming (SSE / chunked) | hand-written helpers under `client/{service}/streaming/` (§5 A1) | reads via exposed `ApiClient.tokens` |
+
+### Token authority (single source of truth)
+- The generated `ApiClient`'s `TokenStore` (§6) is the **single token authority** for the whole SDK family. Key names (`ssp_access_token` / `ssp_refresh_token`) and the refresh route are owned by AUTH-SPEC.
+- `@progalaxyelabs/ngx-stonescriptphp-files-client` MUST NOT read tokens from its own storage or a hand-passed `token` argument. It obtains the access token from the api-client's `TokenStore` (the same instance ngx provides via DI) and honors the same 401→refresh→retry behavior `MinimalHttp` implements (delegate to it; do not re-implement).
+- Rationale: two independent token readers drift (the `access_token` vs `ssp_access_token` bug). One authority — every lane reads it.
+- Integration: ngx's `provideNgxStoneScriptPhpClient(apiUrl)` constructs `ApiClient`; the files `FilesService` is given the same `ApiClient` (or its `tokens: TokenStore`) so both lanes share auth state. The files-client's public surface (`upload(file, entityType?, entityId?)`, `download(fileId): Blob`, `list()`, `delete(fileId)`) stays; only its token sourcing changes.
+
+### Platforms MUST NOT
+- Use raw `fetch` / `HttpClient` to the files service from platform code — use `FilesService`.
+- Construct `Authorization: Bearer` headers by hand anywhere (re-introduces the stale-key bug).
+- Add blob / FormData methods to `ApiClient`. A route that returns or accepts binary belongs to the files service.
 
 ---
 
