@@ -22,8 +22,12 @@ Path shape: **`/{service}/tenant/{tenantId}/{group}/{action}[/{id}]`**
 - **group** = one per **domain resource/intent** → `api.{group}.*` (kebab→camel). Per-table is the
   common case, but the rule is by *concept*, not schema.
 - **action** = explicit verb in the URL (kebab→camel method): `items/update-name` → `items.updateName`.
-- **HTTP method rule:** reads → `GET`, writes → `POST`. The action word carries the verb; do NOT
-  map update→PUT / delete→DELETE (collapses synonym drift across 11 platforms).
+- **HTTP method rule (naming convention):** reads → `GET`, writes → `POST` by default. The action
+  word carries the verb; prefer NOT to map update→PUT / delete→DELETE (collapses synonym drift
+  across 11 platforms). **Transport capability (since v4.2.0):** the generated client DOES support
+  `PUT`/`DELETE`/`PATCH` for routes that declare them — see §5. The GET/POST preference is a naming
+  guideline, not a transport limitation; PUT/DELETE/PATCH routes are first-class and emit real typed
+  methods (no reject-stub).
 - **Naming authority (ends the dev-team `wou` debates):** *the group/action name is the contract
   concept the endpoint serves — declared explicitly on the route. Physical schema (table, column,
   or SQL join/FROM order) is NEVER a naming input.*
@@ -135,7 +139,7 @@ header (or query param token where EventSource does not support custom headers).
 generated client's `TokenStore` is exported so streaming helpers can read the token via
 `api.tokens.get()`.
 
-**Cross-reference:** §5 (MinimalHttp only implements GET+POST, no streaming), §7 (ApiClient
+**Cross-reference:** §5 (MinimalHttp implements GET/POST/PUT/DELETE/PATCH, no streaming), §7 (ApiClient
 generated methods).
 
 ---
@@ -366,7 +370,7 @@ are always excluded from all packages.
 
 **Admin client shape:** identical structure to the business client — `MinimalHttp`,
 `TokenStore`, `ApiError` verbatim; groups and methods generated from `group:` declarations;
-GET+POST only. The sole difference is the absence of `setTenant()` and the absence of any
+all HTTP verbs (GET/POST/PUT/DELETE/PATCH) per §5. The sole difference is the absence of `setTenant()` and the absence of any
 `/tenant/{id}` segment in generated URLs.
 
 **Angular consumption:** the admin Angular service (`docker/admin/`) references
@@ -444,7 +448,7 @@ The net effect: every platform that consumes the generated client needs a hand-w
 | **Module-grouped** | Routes are grouped by concept, declared on the route: `api.inventory.create()`, `api.billing.createBill()`. No `api.stores.*` catchall. |
 | **Tenant-context-once** | The consumer calls `api.setTenant(id)` once after tenant selection (T3 only). All subsequent tenant-scoped calls use that context silently. No `tenantId` in every method signature. |
 | **Frozen token management** | localStorage, fixed key names, no choices. AUTH-SPEC owns the contract. |
-| **GET/POST only** | Reads → `GET`. Writes → `POST`. The action name in the URL carries the verb. No PUT/DELETE. |
+| **All HTTP verbs** | Reads → `GET`. Writes → `POST` by convention (action name carries the verb), but the client also supports `PUT`/`DELETE`/`PATCH` (since v4.2.0) for routes that declare them. |
 | **Auth is separate** | The business client contains no auth routes. Auth is the domain of `stonescriptphp-auth-client` (contract interface) and its builtin or external concrete implementations. |
 | **Angular wrapper is thin** | `ngx-stonescriptphp-client` wraps the generated client for Angular-specific concerns (signals, route guards, UI components). It does not own HTTP or tokens. |
 | **Source of truth is the API** | The generated client mirrors `routes.php` exactly. When routes change, regenerate. No hand-maintained URL strings in Angular code. |
@@ -462,7 +466,7 @@ The net effect: every platform that consumes the generated client needs a hand-w
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
 │  │  MinimalHttp    │  │  TokenStore     │  │  DTOs / types   │  │
 │  │  (fetch-based,  │  │  (localStorage, │  │  (from PHP DTOs)│  │
-│  │   GET+POST only)│  │   frozen keys)  │  │                 │  │
+│  │   all verbs)    │  │   frozen keys)  │  │                 │  │
 │  └────────┬────────┘  └────────┬────────┘  └─────────────────┘  │
 │           │                    │                                   │
 │  ┌────────▼────────────────────▼────────────────────────────────┐ │
@@ -556,7 +560,7 @@ No external runtime dependencies. The `file:` reference in the Angular service's
 
 Emitted verbatim (not generated from routes). Included in every client output.
 
-**HTTP method constraint (B2):** Only `GET` and `POST`. The action name in the URL carries the semantic verb. No `PUT`, no `DELETE`.
+**HTTP methods (B2, amended v4.2.0):** Supports `GET`, `POST`, `PUT`, `DELETE`, and `PATCH`. Reads → `GET`; writes → `POST` by naming convention (the action name carries the semantic verb, minimizing synonym drift), but `PUT`/`DELETE`/`PATCH` routes are first-class: `MinimalHttp` exposes `put()`, `delete()`, and `patch()` that delegate to the same private `request()` as `post()` — identical auth-header injection, 401-refresh retry, and envelope handling. `DELETE` carries an optional body. The method-emission step emits real typed methods for every verb (no `Unsupported HTTP method` reject-stub).
 
 **Envelope contract (B5):** Handles `{status:"ok"|"error", message, data}` only. Returns `body.data` verbatim on success (including `null` — no `?? body` fallback). Exposes `body.data.error` as `ApiError.code` on failure. Guards `res.json()` against non-JSON transport errors.
 
@@ -587,8 +591,21 @@ export class MinimalHttp {
     return this.request<T>('POST', path, body);
   }
 
+  async put<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('PUT', path, body);
+  }
+
+  async patch<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('PATCH', path, body);
+  }
+
+  // DELETE may carry an optional body. Mirrors post().
+  async delete<T = unknown>(path: string, body?: unknown): Promise<T> {
+    return this.request<T>('DELETE', path, body);
+  }
+
   private async request<T>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
     path: string,
     body?: unknown,
     params?: HttpParams,
@@ -1029,8 +1046,8 @@ The PHP router's first decision is which handler group owns the request. Putting
 **Why `tenant` not `store`/`warehouse`/`workspace`:**
 AUTH-SPEC, the gateway, and the DB all use `tenant_id`. The URL must match the vocabulary of the authorization layer.
 
-**Why GET + POST only (B2):**
-PUT and DELETE are aliases for "update" and "remove" — but those are already said by the action word in the URL. Removing HTTP verb semantics collapses synonym drift: teams no longer debate "should this be PUT or PATCH?" The action name is the contract.
+**Why GET + POST is the naming default (B2) — and why PUT/DELETE/PATCH are still supported:**
+For most writes, PUT and DELETE are aliases for "update" and "remove" — already said by the action word in the URL. Defaulting writes to POST collapses synonym drift: teams don't debate "should this be PUT or PATCH?" for ordinary CRUD; the action name is the contract. However, some routes genuinely need REST verbs (idempotent PUT replace, RESTful DELETE, JSON-merge PATCH), and forcing them through POST-only meant those endpoints were uncallable. Since v4.2.0 the client emits real typed methods for PUT/DELETE/PATCH routes (§5). Keep using POST-by-convention for normal writes; reach for PUT/DELETE/PATCH only when the route is deliberately REST-shaped.
 
 **PHP route definition pattern:**
 
@@ -1127,6 +1144,14 @@ The generated DTOs mirror the PHP DTO classes. The generator reads `src/App/DTO/
 - `status !== "ok"` → throws `ApiError` with `message`, `httpStatus`, and `code` (`data.error`).
 
 Callers never see the envelope wrapper. They receive the payload directly on success, and a typed `ApiError` on failure.
+
+**`ApiResponse` baseline type (amended v4.2.0):** the generated `types.ts` baseline is:
+
+```typescript
+export type ApiResponse = unknown;
+```
+
+Previously this was `Record<string, unknown> | unknown[] | null`. That union's `unknown[]` member broke strict narrowing — consumers could not write `const x = resp as MyType` and instead had to double-cast `resp as unknown as MyType`. Typing the baseline as `unknown` lets every consumer narrow the payload with a single `as MyType` cast (or a type guard). Platforms that generate specific DTOs still override the per-endpoint return types; `ApiResponse` is only the generic fallback. `ApiRequestBody` is unchanged.
 
 **Auth-client envelope (external — handled by auth-client, not MinimalHttp):**
 
