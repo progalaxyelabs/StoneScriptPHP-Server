@@ -1005,6 +1005,53 @@ export class ApiClient {
 }
 ```
 
+### Escape-hatch passthroughs (v4.3.1)
+
+The generated `ApiClient` exposes low-level escape-hatch methods for endpoints that have no
+typed `api.<group>.<action>()` method (e.g. cross-cutting infra probes, or metadata-driven
+endpoints where per-endpoint typed methods would be wrong). Since v4.3.1 all five HTTP verbs
+are available:
+
+```typescript
+// All five escape-hatch passthroughs — T3 tenant-scoped (portal) client shown.
+// /portal/* paths receive the active tenant prefix via escapePath(); other paths pass verbatim.
+api.get<R>(path, params?)   // GET  — same as before
+api.post<R>(path, body?)    // POST — same as before
+api.put<R>(path, body?)     // PUT  — added v4.3.1
+api.patch<R>(path, body?)   // PATCH — added v4.3.1
+api.delete<R>(path, body?)  // DELETE — added v4.3.1
+```
+
+**Admin / T2 clients:** escape-hatch paths are NOT tenant-rewritten — they pass verbatim.
+**T3 portal clients:** `/portal/...` paths receive the active `setTenant()` prefix; other paths
+(e.g. `/api/...`, `/subscription/...`) pass verbatim. The caller never builds
+`/portal/tenant/{id}/...` manually.
+
+**NEVER use the escape hatch for an endpoint that already has a typed `api.<group>.<action>()`**
+— if you reach for `api.put('/portal/...')` and the route already has a typed method, the
+route is missing its `group:/action:` declaration; fix the declaration instead.
+
+### Binary / blob responses
+
+The generated `ApiClient` (and its `MinimalHttp` transport) is **JSON-only**. It JSON-parses
+every response and unwraps the StoneScriptPHP envelope — it cannot return a `Blob` or a
+`ReadableStream`. For binary downloads (PDFs, XLSX, images), use a raw `fetch` with the bearer
+token from `api.tokens.get()`:
+
+```typescript
+// Binary download — use raw fetch, NOT the generated client
+const token = api.tokens.get();
+const res   = await fetch('/portal/tenant/42/reports/ca-package?year=2026', {
+  headers: token ? { Authorization: `Bearer ${token}` } : {},
+});
+const blob  = await res.blob();
+```
+
+The bearer token is the one source of truth — read it from `api.tokens.get()` so token
+refresh remains owned by `MinimalHttp` (the next API call that triggers a 401 will refresh
+normally). Do not duplicate the token or pass it as a prop. See §14 for the full binary I/O
+ownership model.
+
 ---
 
 ## 8. URL Route Convention
