@@ -1130,7 +1130,76 @@ No `setTenant()`. No tenant scope. All routes are at `/{service}/{group}/{action
 
 ## 10. Request / Response Contract
 
-The generated DTOs mirror the PHP DTO classes. The generator reads `src/App/DTO/*.php` and emits TypeScript interfaces in `src/types.ts`.
+The generated DTOs mirror the PHP DTO classes. The generator emits TypeScript interfaces in `src/types.ts` for every DTO a route declares via its `response:` slot (see "Typed return types" below).
+
+### Typed return types (v4.3.0)
+
+By default every generated method returns `Promise<ApiResponse>` (= `unknown`) — the caller narrows the payload with a single `as X` cast. A route MAY opt into a typed return by declaring a response DTO. This is **incremental and graceful**: routes that declare nothing are unchanged.
+
+**Route keys (added to the route-meta array):**
+
+| Key          | Type         | Meaning |
+|--------------|--------------|---------|
+| `response`   | `Dto::class` | FQCN of a PHP class whose **public typed properties** describe the success payload. The generator reflects it into a TS `interface` and types the method's return. |
+| `collection` | `bool`       | `true` → the endpoint returns a bare JSON array of the DTO → method typed `Promise<Dto[]>`. `false`/absent → single object → `Promise<Dto>`. Ignored when `response` is absent. |
+
+```php
+// routes.php
+'/portal/warehouses' => [
+    'handler'    => App\Routes\Warehouses\ListWarehousesRoute::class,
+    'service'    => 'portal',
+    'group'      => 'warehouses',
+    'action'     => 'list',
+    'response'   => App\Models\Warehouse::class,  // ← typed return
+    'collection' => true,                          // ← Promise<Warehouse[]>
+],
+```
+
+Generates:
+
+```typescript
+// client.ts
+list: (params?: HttpParams) =>
+  this.http.get<T.Warehouse[]>(`${this.t}/portal/warehouses`, params),
+
+// types.ts
+export interface Warehouse {
+  id: number;
+  name: string;
+  postal_code?: string | null;
+  capacity: number;
+  // …
+}
+```
+
+Consumers call it with **zero casts**: `const ws = await api.warehouses.list(); ws[0].capacity // number`.
+
+**DTO convention.** A response DTO is a plain PHP class with **public typed properties** (constructor-promoted or plain). The typed properties — not `toArray()` — are the source of truth. Recommended location: `App\Dto\`. An existing `App\Models\*` class MAY be reused as the response DTO when it already is a clean typed shape (as `App\Models\Warehouse` is). Only public, non-static properties are reflected.
+
+**PHP → TS type mapping:**
+
+| PHP type | TS type |
+|----------|---------|
+| `int`, `float` | `number` |
+| `string` | `string` |
+| `bool` | `boolean` |
+| `?T` (nullable) | `T \| null` (and the property is marked optional `?`) |
+| `DateTimeInterface` / `DateTime` / `DateTimeImmutable` | `string` (ISO-8601 on the wire) |
+| `array` (untyped) | `unknown[]` |
+| `array` with `/** @var Foo[] */` or `@var array<Foo>` docblock | `Foo[]` |
+| a nested DTO class `Foo` | `Foo` — its interface is emitted recursively (deduped, cycle-safe) |
+| a string-backed `enum` | string-literal union (`'a' \| 'b'`); other enums → `string` |
+| `mixed`, `object`, union/intersection types | `unknown` |
+
+Nested DTO interfaces are emitted once and reused; reference cycles are broken by name (a class mid-reflection is referenced, not re-expanded). The DTO registry is reset per service package, so a DTO declared on an `admin` route does not leak into the `portal` `types.ts`.
+
+**Undeclared routes fall back to `unknown`.** Any route without a `response:` keeps `Promise<ApiResponse>` / `this.http.<verb><ApiResponse>(...)`. If a declared DTO class cannot be found, the generator warns and falls back to `ApiResponse` rather than aborting.
+
+**Limitations (route author handles these explicitly):**
+- The generator cannot infer the shape of dynamic / `array_merge` / computed / joined responses, or paginated envelopes like `{ data: Dto[], total, limit, offset }`. For a wrapped envelope, declare a wrapper DTO (e.g. `class CustomerListResponse { /** @var Customer[] */ public array $data; public int $total; … }`) and point `response:` at it (with `collection:` **false**, since the top-level payload is an object).
+- Union return types are not modelled — they map to `unknown`.
+
+### Legacy / generic types
 
 **Business client envelope (builtin — B5):**
 
