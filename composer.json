@@ -2,7 +2,7 @@
     "name": "progalaxyelabs/stonescriptphp-server",
     "description": "Application skeleton for StoneScriptPHP. Ready-to-use project template with CLI tools, folder structure, and examples. Includes the stonescriptphp framework as a dependency.",
     "type": "project",
-    "version": "3.21.0",
+    "version": "3.22.0",
     "license": "MIT",
     "keywords": [
         "stonescriptphp",
@@ -28,7 +28,7 @@
     ],
     "require": {
         "php": "^8.2",
-        "progalaxyelabs/stonescriptphp": "^3.21"
+        "progalaxyelabs/stonescriptphp": "^5.1"
     },
     "suggest": {
         "progalaxyelabs/stonescriptphp-pay": "Payment provider abstraction (Razorpay driver included). Required for selling platforms that accept payments."

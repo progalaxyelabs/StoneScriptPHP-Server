@@ -21,8 +21,8 @@ COPY <<'EOF' composer.json
 {
     "require": {
         "php": "^8.3",
-        "progalaxyelabs/stonescriptphp": "^3.0",
-        "progalaxyelabs/stonescriptdb-gateway-client": "^2.0"
+        "progalaxyelabs/stonescriptphp": "^5.1",
+        "progalaxyelabs/stonescriptdb-gateway-client": "^3.0"
     }
 }
 EOF
