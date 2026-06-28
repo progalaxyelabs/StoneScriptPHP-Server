@@ -26,8 +26,9 @@ return [
 
         // JWT 'iss' claim value — must match exactly what the auth server stamps in tokens.
         // In Docker: AUTH_SERVICE_URL = container URL, AUTH_ISSUER = public URL the server stamps.
-        // Leave empty to fall back to 'url' (single-host / local dev).
-        'issuer' => '',
+        // null = resolved from AUTH_ISSUER env var at runtime (must be set in docker-compose.swarm.yaml).
+        // NEVER set to '' — framework v5.2 throws RuntimeException at boot on empty string.
+        'issuer' => null,
 
         // Override auth service endpoint paths if they differ from progalaxyelabs-auth defaults.
         // Only set entries that differ — unset entries use the defaults shown here.
