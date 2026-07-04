@@ -45,6 +45,10 @@ logs/*
 *.db
 /postgresql-data/
 
+# Vendor-provided opt-in schema (regenerated on every composer install/update
+# by cli/sync-vendor-schema.php — never hand-edit, never commit)
+/src/postgresql/vendor/
+
 # OS Files
 .DS_Store
 Thumbs.db

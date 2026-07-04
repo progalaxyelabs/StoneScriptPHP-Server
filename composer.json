@@ -50,10 +50,12 @@
     "bin": ["stone"],
     "scripts": {
         "post-install-cmd": [
-            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\""
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\"",
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/cli/sync-vendor-schema.php')) { include 'vendor/progalaxyelabs/stonescriptphp/cli/sync-vendor-schema.php'; }\""
         ],
         "post-update-cmd": [
-            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\""
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\"",
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/cli/sync-vendor-schema.php')) { include 'vendor/progalaxyelabs/stonescriptphp/cli/sync-vendor-schema.php'; }\""
         ],
         "post-create-project-cmd": [
             "@php stone setup"
