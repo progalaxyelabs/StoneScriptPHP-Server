@@ -1,16 +1,19 @@
 # Docker Deployment Guide
 
-This directory contains **sample Docker configurations** for reference. In production, you'll typically have a multi-service setup with your own `docker-compose.yaml` at the project root.
+This project ships ready-to-build `Dockerfile.dev` / `Dockerfile.prod` images plus the
+`docker/` nginx+supervisor configs they COPY in. It does **not** ship a
+`docker-compose.dev.yaml` / `docker-compose.prod.yaml` at the repo root — those are
+illustrative only (see the "Sample Project-Level docker-compose.yaml" further down).
+In a real project you assemble your own `docker-compose.yaml` at the project root
+that builds this directory as one service alongside Postgres, your frontend, etc.
 
 ## Files Overview
 
 ### Development
 - **`Dockerfile.dev`** - Development image using PHP-FPM + Nginx (with hot reload)
-- **`docker-compose.dev.yaml`** - Sample development setup (PostgreSQL + API)
 
 ### Production
 - **`Dockerfile.prod`** - Production image using PHP-FPM + Nginx (optimized)
-- **`docker-compose.prod.yaml`** - Sample production setup
 - **`docker/`** - Nginx and Supervisor configurations
 
 ---
@@ -44,27 +47,37 @@ Both development and production Dockerfiles use PHP-FPM + Nginx. The key differe
 - Size: ~600MB (includes dev tools)
 - Use case: Local testing, debugging, easy to exec into container
 
-**Production (Alpine-based):**
-- Base: `php:8.3-fpm-alpine` (Alpine Linux)
-- Tools: Minimal runtime only
-- PHP: OPcache enabled, errors hidden, optimized autoloader
-- Size: ~50MB (minimal footprint)
+**Production (Debian-based, multi-stage):**
+- Base: `php:8.3-fpm-bookworm` (Debian) — **same base as dev**, not Alpine. A
+  multi-stage build (composer install in a `builder` stage, runtime-only apt
+  packages in the final stage) keeps the image reasonably small without
+  switching distros.
+- Tools: Minimal runtime only (no dev packages, build deps purged after
+  compiling PHP extensions)
+- PHP: OPcache enabled (`validate_timestamps=0`), errors hidden
+  (`display_errors=Off`), optimized/classmap-authoritative autoloader
+- Size: several hundred MB (Debian slim, not ~50MB — do not assume Alpine-level
+  footprint when sizing registries/CI caches)
 - Use case: Production deployment, optimized performance
 
 ### Quick Start (Development)
 
-```bash
-# Start development environment
-docker compose -f docker-compose.dev.yaml up -d
+There is no `docker-compose.dev.yaml` shipped in this repo — build `Dockerfile.dev`
+as one service in your project-level compose file (see the sample further down),
+then:
 
-# Run migrations
-docker exec -it stonescriptphp-app php stone migrate up
+```bash
+# Start development environment (from your project-level docker-compose.yaml)
+docker compose up -d
+
+# Register/migrate schema with the gateway (v3+ — see the framework's gateway:* commands)
+docker exec -it stonescriptphp-app php stone migrate
 
 # Create admin user
 docker exec -it stonescriptphp-app php stone create:admin
 
 # View logs
-docker compose -f docker-compose.dev.yaml logs -f app
+docker compose logs -f api
 ```
 
 ---
@@ -77,30 +90,35 @@ The production setup uses:
 - **PHP-FPM** - FastCGI Process Manager for high performance
 - **Nginx** - Industry-standard web server
 - **Supervisor** - Process manager for PHP-FPM + Nginx
-- **OPcache** - Optimized bytecode caching
-- **Alpine Linux** - Minimal footprint (~50MB base image)
+- **OPcache** - Optimized bytecode caching, `validate_timestamps=0`, classmap-authoritative autoloader
+- **Debian (bookworm-slim), not Alpine** - `Dockerfile.prod` is a multi-stage build on the
+  same `php:8.3-fpm-bookworm` base as dev (build deps are purged after compiling
+  extensions); it is not an Alpine image and is not ~50MB
 
 ### Build Production Image
 
+There is no `docker-compose.prod.yaml` shipped in this repo — build `Dockerfile.prod`
+as one service in your project-level compose file:
+
 ```bash
-# Build the production image
+# Build the production image directly
 docker build -f Dockerfile.prod -t stonescriptphp-api:latest .
 
-# Or with docker-compose
-docker compose -f docker-compose.prod.yaml build
+# Or as part of your project-level docker-compose.yaml
+docker compose build api
 ```
 
 ### Deploy to Production
 
 ```bash
-# Start production environment
-docker compose -f docker-compose.prod.yaml up -d
+# Start production environment (from your project-level docker-compose.yaml)
+docker compose up -d
 
-# Run migrations
-docker exec -it stonescriptphp-app php stone migrate up
+# Register/migrate schema with the gateway (v3+)
+docker exec -it stonescriptphp-app php stone migrate
 
 # Check health
-curl http://localhost:8000/api/health
+curl http://localhost:8000/health
 ```
 
 ---
@@ -297,7 +315,7 @@ docker exec stonescriptphp-app tail -f /var/log/php_errors.log
 docker ps
 
 # Test health endpoint
-curl http://localhost:8000/api/health
+curl http://localhost:8000/health
 
 # Check PHP-FPM status
 docker exec stonescriptphp-app ps aux | grep php-fpm
