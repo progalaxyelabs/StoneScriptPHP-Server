@@ -21,7 +21,6 @@
 /.claude/
 /.phpunit.cache/
 /.phpunit.result.cache
-/phpunit.xml
 *.swp
 *.swo
 *~

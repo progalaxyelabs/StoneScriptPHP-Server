@@ -4,8 +4,24 @@ namespace App\Routes;
 
 use StoneScriptPHP\ApiResponse;
 use StoneScriptPHP\IRouteHandler;
-use StoneScriptPHP\Database;
 
+/**
+ * Health check route.
+ *
+ * Deliberately does NOT check database/gateway connectivity: this endpoint
+ * backs Docker/swarm liveness probes, and a DB blip should not cascade into
+ * a container restart loop. Matches every real StoneScriptPHP-powered
+ * platform's HealthRoute (webmeteor-platform, medstoreapp-platform, etc.).
+ *
+ * NOTE: an earlier version of this route called `Database::query("SELECT 1")`
+ * to check connectivity — that method does not exist on the framework's
+ * `Database` class (the gateway-only architecture only exposes
+ * `Database::fn($name, $params)`, no raw SQL). Because the resulting
+ * `Call to undefined method` is a PHP \Error, not an \Exception, the
+ * surrounding `catch (\Exception $e)` never caught it and every request to
+ * this route fataled instead of degrading gracefully. Removed rather than
+ * "fixed" with a real DB call, per the liveness-probe reasoning above.
+ */
 class HealthRoute implements IRouteHandler
 {
     function validation_rules(): array
@@ -15,21 +31,9 @@ class HealthRoute implements IRouteHandler
 
     function process(): ApiResponse
     {
-        $health = [
+        return res_ok([
             'status' => 'healthy',
             'timestamp' => date('c'),
-            'checks' => []
-        ];
-
-        // Check database connection
-        try {
-            Database::query("SELECT 1");
-            $health['checks']['database'] = 'ok';
-        } catch (\Exception $e) {
-            $health['status'] = 'unhealthy';
-            $health['checks']['database'] = 'failed';
-        }
-
-        return res_ok($health, 'Health check');
+        ], 'Health check');
     }
 }

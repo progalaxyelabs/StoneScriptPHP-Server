@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f59a51bfd1ecc6e527659b306b80b7a3",
+    "content-hash": "9930e96f82c82b2c6884550e87ba663f",
     "packages": [
         {
             "name": "firebase/php-jwt",
@@ -211,16 +211,16 @@
         },
         {
             "name": "progalaxyelabs/stonescriptdb-gateway-client",
-            "version": "v3.0.0",
+            "version": "v3.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/progalaxyelabs/stonescriptdb-gateway-client.git",
-                "reference": "d6c4f404777b46a4b4cef1c79f19d7974459d4c9"
+                "reference": "855a186a82af47864e72492fb149681418659a1b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/progalaxyelabs/stonescriptdb-gateway-client/zipball/d6c4f404777b46a4b4cef1c79f19d7974459d4c9",
-                "reference": "d6c4f404777b46a4b4cef1c79f19d7974459d4c9",
+                "url": "https://api.github.com/repos/progalaxyelabs/stonescriptdb-gateway-client/zipball/855a186a82af47864e72492fb149681418659a1b",
+                "reference": "855a186a82af47864e72492fb149681418659a1b",
                 "shasum": ""
             },
             "require": {
@@ -260,22 +260,22 @@
             ],
             "support": {
                 "issues": "https://github.com/progalaxyelabs/stonescriptdb-gateway-client/issues",
-                "source": "https://github.com/progalaxyelabs/stonescriptdb-gateway-client/tree/v3.0.0"
+                "source": "https://github.com/progalaxyelabs/stonescriptdb-gateway-client/tree/v3.1.1"
             },
-            "time": "2026-06-27T02:39:15+00:00"
+            "time": "2026-07-04T15:00:34+00:00"
         },
         {
             "name": "progalaxyelabs/stonescriptphp",
-            "version": "5.1.0",
+            "version": "6.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/progalaxyelabs/StoneScriptPHP.git",
-                "reference": "574176e821b22e3c31653bc19d84c54d8cdde57b"
+                "reference": "5911f46c45749bc1566688b7f78e7778000e04ab"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/progalaxyelabs/StoneScriptPHP/zipball/574176e821b22e3c31653bc19d84c54d8cdde57b",
-                "reference": "574176e821b22e3c31653bc19d84c54d8cdde57b",
+                "url": "https://api.github.com/repos/progalaxyelabs/StoneScriptPHP/zipball/5911f46c45749bc1566688b7f78e7778000e04ab",
+                "reference": "5911f46c45749bc1566688b7f78e7778000e04ab",
                 "shasum": ""
             },
             "require": {
@@ -287,6 +287,7 @@
                 "vlucas/phpdotenv": "^5.6"
             },
             "require-dev": {
+                "google/apiclient": "^2.0",
                 "phpstan/phpstan": "^2.1",
                 "phpunit/phpunit": "^11.5.50"
             },
@@ -333,7 +334,7 @@
                 "issues": "https://github.com/progalaxyelabs/StoneScriptPHP/issues",
                 "source": "https://github.com/progalaxyelabs/StoneScriptPHP"
             },
-            "time": "2026-06-27T03:11:45+00:00"
+            "time": "2026-07-08T12:31:01+00:00"
         },
         {
             "name": "symfony/polyfill-ctype",
@@ -589,16 +590,16 @@
         },
         {
             "name": "vlucas/phpdotenv",
-            "version": "v5.6.3",
+            "version": "v5.6.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/vlucas/phpdotenv.git",
-                "reference": "955e7815d677a3eaa7075231212f2110983adecc"
+                "reference": "416df702837983f8d5ff48c9c3fee4f5f57b980b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/955e7815d677a3eaa7075231212f2110983adecc",
-                "reference": "955e7815d677a3eaa7075231212f2110983adecc",
+                "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/416df702837983f8d5ff48c9c3fee4f5f57b980b",
+                "reference": "416df702837983f8d5ff48c9c3fee4f5f57b980b",
                 "shasum": ""
             },
             "require": {
@@ -657,7 +658,7 @@
             ],
             "support": {
                 "issues": "https://github.com/vlucas/phpdotenv/issues",
-                "source": "https://github.com/vlucas/phpdotenv/tree/v5.6.3"
+                "source": "https://github.com/vlucas/phpdotenv/tree/v5.6.4"
             },
             "funding": [
                 {
@@ -669,7 +670,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2025-12-27T19:49:13+00:00"
+            "time": "2026-07-06T19:11:50+00:00"
         }
     ],
     "packages-dev": [
