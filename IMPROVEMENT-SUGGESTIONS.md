@@ -635,7 +635,7 @@ class PostQaWebhookRoute implements IRouteHandler
     public static function getRequiredEnvVars(): array
     {
         return [
-            'QA_WEBHOOK_SECRET' => 'Secret key for validating webhook requests from work-management'
+            'QA_WEBHOOK_SECRET' => 'Secret key for validating incoming CI/QA webhook requests'
         ];
     }
 

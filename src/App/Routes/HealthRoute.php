@@ -10,8 +10,8 @@ use StoneScriptPHP\IRouteHandler;
  *
  * Deliberately does NOT check database/gateway connectivity: this endpoint
  * backs Docker/swarm liveness probes, and a DB blip should not cascade into
- * a container restart loop. Matches every real StoneScriptPHP-powered
- * platform's HealthRoute (webmeteor-platform, medstoreapp-platform, etc.).
+ * a container restart loop. Matches the HealthRoute convention used by
+ * StoneScriptPHP-powered platforms in general.
  *
  * NOTE: an earlier version of this route called `Database::query("SELECT 1")`
  * to check connectivity — that method does not exist on the framework's

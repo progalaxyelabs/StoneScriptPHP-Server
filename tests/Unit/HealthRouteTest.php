@@ -19,8 +19,8 @@ use PHPUnit\Framework\TestCase;
  * skeleton's `/health` also backs Docker/swarm liveness probes, that would
  * have kept any scaffolded container permanently "unhealthy".
  *
- * Fix: dropped the DB check entirely (matches every real platform's
- * HealthRoute — webmeteor-platform, medstoreapp-platform — which also never
+ * Fix: dropped the DB check entirely (matches the HealthRoute convention
+ * used by StoneScriptPHP-powered platforms in general, which also never
  * probe the database here, since a DB blip should not cascade into a
  * container restart loop).
  */

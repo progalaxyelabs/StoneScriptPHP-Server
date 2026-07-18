@@ -1,7 +1,7 @@
 # StoneScriptPHP — Generated Client SDK Specification
 
 **Status:** APPROVED (review sign-off 2026-06-14)
-**Author:** ProGalaxy eLabs dev team  
+**Author:** StoneScriptPHP maintainers  
 **Date:** 2026-06-13 · revised 2026-06-14  
 **Scope:** `php stone generate client` command, URL route conventions, relationship with `ngx-stonescriptphp-client`
 
@@ -9,7 +9,7 @@
 
 ## 0. Resolved Decisions (review sign-off — 2026-06-14)
 
-Outcome of the orchestrator review of the DRAFT. These OVERRIDE any conflicting text in
+Outcome of the design review of the DRAFT. These OVERRIDE any conflicting text in
 the sections below; app-dev revises §§1–14 to match. Authority for tenancy + auth is
 **AUTH-SPEC** — this client spec references it, never re-defines it.
 
@@ -28,7 +28,7 @@ Path shape: **`/{service}/tenant/{tenantId}/{group}/{action}[/{id}]`**
   `PUT`/`DELETE`/`PATCH` for routes that declare them — see §5. The GET/POST preference is a naming
   guideline, not a transport limitation; PUT/DELETE/PATCH routes are first-class and emit real typed
   methods (no reject-stub).
-- **Naming authority (ends the dev-team `wou` debates):** *the group/action name is the contract
+- **Naming authority (ends the internal naming debates):** *the group/action name is the contract
   concept the endpoint serves — declared explicitly on the route. Physical schema (table, column,
   or SQL join/FROM order) is NEVER a naming input.*
   - single resource (even via junction-table-driven joins) → that resource's group
@@ -39,15 +39,15 @@ Path shape: **`/{service}/tenant/{tenantId}/{group}/{action}[/{id}]`**
   search = its own `search` group (`search.global`). Not "search as the broadest module."
 - **Grouping is DECLARED on the route, never inferred** from path or query.
 
-### B1 — De-medstoreapp the scoper
+### B1 — De-brand the scoper
 `/tenant/{tenantId}/` is the fixed, framework-level tenant segment (not store/warehouse/workspace).
 `setStore()` → `setTenant()`. Vocabulary matches token/gateway/AUTH-SPEC (`tenant_id`).
 
 ### B2 — Tenant authz is per AUTH-SPEC §T (mode-aware) — NOT a new rule here
-- Target platforms (medstoreapp, logisticsapp, restrantapp, instituteapp) are **T3 (Multi-Tenant/URL)**:
+- Target platforms (example-t3app, example-logistics, example-hospitality, example-education) are **T3 (Multi-Tenant/URL)**:
   tenant-less identity JWT; tenant from URL; validated by the **store-access middleware against the
   identity's memberships (§5c)** — a membership check, NOT a `token.tenant_id === path` compare.
-- **webmeteor = T2** (tenant in platform JWT via `/api/auth/exchange`, no URL tenant). **T1** = none.
+- **example-t2app = T2** (tenant in platform JWT via `/api/auth/exchange`, no URL tenant). **T1** = none.
 - The generated client is **tenancy-mode-aware**: T3 → `setTenant()`/URL param; T2 → tenant via
   exchanged JWT, no URL tenant; T1 → none.
 - Cross-tenant/impersonation bypass: **deferred** (default-deny).
@@ -89,8 +89,8 @@ AUTH-SPEC §Response Envelopes:
 - **Injectable storage adapter is DEFERRED** — adding it later is backward-compatible (optional ctor arg
   defaulting to localStorage). Revisit on the first real non-localStorage consumer.
 
-### B7 — Delete the medstoreapp-revert band-aid
-Remove §13 "Short-term (unblock medstoreapp QC)" entirely. No replacement — finalize the contract,
+### B7 — Delete the example-t3app-revert band-aid
+Remove §13 "Short-term (unblock example-t3app QC)" entirely. No replacement — finalize the contract,
 regenerate once, fix forward.
 
 ### Open-question dispositions
@@ -107,14 +107,14 @@ none deploys un-revalidated. 6. **ngx-pay** → depends on `ApiClient`; align wi
 
 ---
 
-### Amendments (2026-06-14) — contract validation against logisticsapp + webmeteor
+### Amendments (2026-06-14) — contract validation against example-logistics + example-t2app
 
 Six decisions surfaced during the ≥2-platform process gate. All are **resolved and binding**;
 §§1–14 are to be updated to match. Amendments are numbered A1–A6.
 
 #### A1 — Streaming / SSE endpoints are EXCLUDED from the generated business client
 
-**Trigger:** webmeteor `GET /api/workspaces/:id/events` — Server-Sent Events
+**Trigger:** example-t2app `GET /api/resources/:id/events` — Server-Sent Events
 (`text/event-stream`); the build-event stream cannot be modelled as a Promise-returning
 method.
 
@@ -255,7 +255,7 @@ webhook routes to the exclusion pass).
 #### A4 — Sub-resource vs action vs cross-entity group: worked examples
 
 **Trigger:** Ambiguity about when a nested URL segment is an `{action}` on the parent
-group vs. deserving its own `group`. logisticsapp has `GET /portal/.../routes/:id/shipments`
+group vs. deserving its own `group`. example-logistics has `GET /portal/.../routes/:id/shipments`
 (shipments belonging to a route) alongside cross-entity `search`.
 
 **Rule (binding):** The `group` declaration on the route definition is the sole authority.
@@ -330,7 +330,7 @@ signatures).
 #### A6 — Admin client is a separate generated client (OQ3 CLOSED)
 
 **Trigger:** OQ3 was open: "Admin → separate generated client (no tenant scope)." Both
-validated platforms (logisticsapp admin, webmeteor admin) confirm admin routes exist
+validated platforms (example-logistics admin, example-t2app admin) confirm admin routes exist
 alongside portal routes and have distinct access-control semantics.
 
 **Decision:**
@@ -394,7 +394,7 @@ has no `setTenant()`), §9 (Tenant Scoping — note admin client has no tenant s
 convention is now the authoritative record in AUTH-SPEC. This client spec defers to it.
 
 ### Process gate before sign-off
-**CLOSED 2026-06-14** — validated against logisticsapp (T3, mainstream) and webmeteor (T2 +
+**CLOSED 2026-06-14** — validated against example-logistics (T3, mainstream) and example-t2app (T2 +
 streaming + RPC). Convention held; 6 gaps/ambiguities surfaced and resolved as A1–A6 above.
 
 ---
@@ -472,7 +472,7 @@ The net effect: every platform that consumes the generated client needs a hand-w
 │  ┌────────▼────────────────────▼────────────────────────────────┐ │
 │  │  ApiClient  (tenancy-mode-aware)                              │ │
 │  │                                                               │ │
-│  │  T3 (Multi-Tenant/URL — medstoreapp, logisticsapp, etc.):    │ │
+│  │  T3 (Multi-Tenant/URL — example-t3app, etc.):                 │ │
 │  │    setTenant(id) — called once after tenant selection         │ │
 │  │    inventory.list()  inventory.create()  inventory.update()   │ │
 │  │    billing.create()  billing.list()                           │ │
@@ -481,7 +481,7 @@ The net effect: every platform that consumes the generated client needs a hand-w
 │  │    onboarding.status()  onboarding.bulkCreate()               │ │
 │  │    ...one readonly property per group, one fn per route       │ │
 │  │                                                               │ │
-│  │  T2 (webmeteor): tenant encoded in platform JWT via exchange  │ │
+│  │  T2 (example-t2app): tenant in platform JWT via exchange      │ │
 │  │    no setTenant() — no URL tenant segment                     │ │
 │  │                                                               │ │
 │  │  T1 (single-tenant): no tenant scope at all                   │ │
@@ -780,7 +780,7 @@ export class TokenStore {
 
 The generator reads `routes.php` and groups routes by the `group` declared on each route definition. The group name is the API concept served — **never** inferred from path segments, table names, or SQL schema.
 
-### Grouping table (T3 portal — medstoreapp example)
+### Grouping table (T3 portal — example-t3app example)
 
 | Route declaration | Group | Generated method |
 |------------------|-------|-----------------|
@@ -802,9 +802,9 @@ The generator reads `routes.php` and groups routes by the `group` declared on ea
 | `GET /subscription/status` | `subscription` | `subscription.status()` |
 | `POST /subscription/orders/create` | `subscription` | `subscription.createOrder(data)` |
 
-**Note on T2 and T1:** For T2 platforms (webmeteor), the tenant is encoded in the platform JWT; no `/tenant/{tenantId}` segment exists in URLs and `setTenant()` is not generated. For T1 platforms, no tenant scope at all.
+**Note on T2 and T1:** For T2 platforms (example-t2app), the tenant is encoded in the platform JWT; no `/tenant/{tenantId}` segment exists in URLs and `setTenant()` is not generated. For T1 platforms, no tenant scope at all.
 
-**Generated output shape (T3 example — medstoreapp portal):**
+**Generated output shape (T3 example — example-t3app portal):**
 
 ```typescript
 // src/client.ts — generated from routes.php
@@ -1134,12 +1134,12 @@ The `{tenantId}` path parameter is extracted by the framework middleware, valida
 
 ## 9. Tenant Scoping — setTenant()
 
-**T3 platforms (Multi-Tenant/URL: medstoreapp, logisticsapp, restrantapp, instituteapp):**
+**T3 platforms (Multi-Tenant/URL: example-t3app, example-logistics, example-hospitality, example-education):**
 
 ```typescript
 // Consumer code (Angular component, or any JS)
 
-const api = new ApiClient('https://api.medstoreapp.in');
+const api = new ApiClient('https://api.example.com');
 
 // Step 1 — authenticate (handled by auth-client, not the business client):
 // api.tokens.set(accessToken);   // auth-client sets the token after login
@@ -1165,7 +1165,7 @@ Error: [ApiClient] Tenant context not set. Call setTenant(id) after tenant selec
 
 This is a programming error — caught immediately in development, never reaches production.
 
-**T2 platforms (webmeteor):**
+**T2 platforms (example-t2app):**
 
 No `setTenant()`. The tenant is encoded in the platform JWT obtained via the auth exchange route. The generated `ApiClient` for T2 has no `t` getter and no `/tenant/{id}` prefix in any URL.
 
@@ -1354,10 +1354,10 @@ After this redesign, the Angular library's responsibility shrinks and becomes cl
 
 ### Phase 2 — Contract validation (process gate from §0)
 
-Validate the `/{service}/tenant/{tenantId}/{group}/{action}` convention against ≥2 non-medstoreapp platforms before implementation:
+Validate the `/{service}/tenant/{tenantId}/{group}/{action}` convention against ≥2 non-example-t3app platforms before implementation:
 
-- **logisticsapp (T3):** routes involve warehouses, shipments, routes — verify group names fit the convention cleanly and don't collide with `tenant/` vocabulary.
-- **webmeteor (T2):** no URL tenant — verify the T2 generated client shape (no `setTenant`, no `/tenant/{id}` segment) is coherent and the auth exchange flow maps correctly.
+- **example-logistics (T3):** routes involve warehouses, shipments, routes — verify group names fit the convention cleanly and don't collide with `tenant/` vocabulary.
+- **example-t2app (T2):** no URL tenant — verify the T2 generated client shape (no `setTenant`, no `/tenant/{id}` segment) is coherent and the auth exchange flow maps correctly.
 - **An admin surface:** admin has no tenant scope — verify the separate admin client approach (§0 OQ3) is clean.
 
 This gate exists because a contract proven only on its drafting platform ships journey-seam bugs.
@@ -1399,14 +1399,14 @@ This phase precedes broad platform file migration. Its goal is a **proven, versi
 
 1. Update `@progalaxyelabs/ngx-stonescriptphp-files-client` to source the access token from the api-client's `TokenStore` (§6/§14) — remove the hand-passed `token` parameter from its public methods and share `MinimalHttp`'s 401→refresh→retry behavior (delegate, don't duplicate).
 2. Confirm `@progalaxyelabs/stonescriptphp-files` (server) JWT verification matches the api-client token contract (same key / audience / `ssp_*` access token).
-3. **Pilot:** migrate medstoreapp portal file handling off raw `fetch` onto `FilesService`. No raw `fetch`/manual `Bearer` left for file I/O.
+3. **Pilot:** migrate example-t3app portal file handling off raw `fetch` onto `FilesService`. No raw `fetch`/manual `Bearer` left for file I/O.
 4. Verify all three are version-aligned and pass E2E together before any further platform adopts the files client.
 
 ---
 
 ## 14. Files & Binary I/O — separate service + client (NOT the JSON SDK)
 
-**Decision (Pradeep, 2026-06-15):** The generated business client (`ApiClient` / `MinimalHttp`) is **JSON-only**. It MUST NOT grow blob / FormData / binary or streaming methods. Binary file I/O is owned by a dedicated service + client; streaming is owned by hand-written helpers (§5 / A1). Three lanes, **one** token authority.
+**Decision (2026-06-15):** The generated business client (`ApiClient` / `MinimalHttp`) is **JSON-only**. It MUST NOT grow blob / FormData / binary or streaming methods. Binary file I/O is owned by a dedicated service + client; streaming is owned by hand-written helpers (§5 / A1). Three lanes, **one** token authority.
 
 ### Three lanes
 | Concern | Owner | Token source |

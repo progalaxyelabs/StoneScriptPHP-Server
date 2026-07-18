@@ -294,7 +294,7 @@ The access token is a JWT signed with RS256. The PHP framework validates it usin
 | `identity_id`   | string (UUID)  | User's identity UUID in the auth system |
 | `tenant_id`     | string (UUID)  | Tenant the token is scoped to |
 | `tenant_slug`   | string         | Human-readable tenant slug (e.g., `"acme"`) |
-| `platform_code` | string         | Platform identifier (e.g., `"medstoreapp"`) |
+| `platform_code` | string         | Platform identifier (e.g., `"example-app"`) |
 | `role`          | string         | User's role in this tenant (e.g., `"admin"`, `"staff"`) |
 | `local_user_id` | string \| null | Platform-specific user record ID (null if not yet linked) |
 | `iat`           | integer        | Issued-at timestamp (Unix) |
