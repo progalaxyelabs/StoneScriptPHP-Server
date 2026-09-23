@@ -59,12 +59,12 @@ broken regen fails red instead of shipping.
 
 ### B4 — Auth: no `auth` group in the generated business client
 Split by mode: **builtin** auth → routes are in the platform's `routes.php`, so the framework
-generates them (conformant by construction); **external** auth (private `progalaxyelabs-auth`) → NOT
+generates them (conformant by construction); **external** auth (a private or custom auth service) → NOT
 generated. Three pieces:
 - **`stonescriptphp-auth-client`** = the **contract/interface** only (interface + DTOs + error codes +
   token convention + envelope-normalization). Opensource. No concrete network class.
 - **builtin impl** → emitted by `php stone generate client`.
-- **external impl** → a separate **private/Verdaccio** concrete adapter (e.g. `progalaxyelabs-auth-client`)
+- **external impl** → a separate **private/Verdaccio** concrete adapter (e.g. your auth service's client)
   implementing the contract against the private daemon. Written once, reused across all platforms.
 Both impls satisfy the one AUTH-SPEC-defined interface → builtin↔external swappable, zero app change.
 This **splits** today's concrete `stonescriptphp-auth-client` (deliberate refactor, not a rename).
@@ -1271,7 +1271,7 @@ Previously this was `Record<string, unknown> | unknown[] | null`. That union's `
 
 **Auth-client envelope (external — handled by auth-client, not MinimalHttp):**
 
-The `progalaxyelabs-auth` daemon uses a different envelope shape (`{success,...}`). That normalization is the auth-client's responsibility (AUTH-SPEC §P5). `MinimalHttp` in the business client does not handle it — they are separate concerns.
+An external auth daemon may use a different envelope shape (`{success,...}`). That normalization is the auth-client's responsibility (AUTH-SPEC §P5). `MinimalHttp` in the business client does not handle it — they are separate concerns.
 
 ---
 

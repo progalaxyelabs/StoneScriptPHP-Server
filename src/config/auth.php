@@ -3,7 +3,7 @@
 return [
     // Auth mode:
     //   'builtin'  — StoneScriptPHP issues/validates its own JWTs (RSA keys in ./keys/)
-    //   'external' — delegate all auth to a separate auth service (progalaxyelabs-auth or custom)
+    //   'external' — delegate all auth to a separate auth service (an external auth service or custom)
     //   'hybrid'   — validate external JWTs + optionally issue own tokens
     'mode' => 'external',
 
@@ -30,7 +30,7 @@ return [
         // NEVER set to '' — framework v5.2 throws RuntimeException at boot on empty string.
         'issuer' => null,
 
-        // Override auth service endpoint paths if they differ from progalaxyelabs-auth defaults.
+        // Override auth service endpoint paths if they differ from your auth service's defaults.
         // Only set entries that differ — unset entries use the defaults shown here.
         'paths' => [
             'jwks'              => '/api/auth/jwks',
