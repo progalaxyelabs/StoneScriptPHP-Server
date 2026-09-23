@@ -1,5 +1,11 @@
 <?php
 
+// NOTE (framework v7.0.0+): with mode = 'external'/'hybrid', the framework's
+// own ExternalAuthRoutes registers some routes as non-public by default
+// (e.g. `change_password`, `profile` below) — these require the typed-auth
+// AccessTokenMiddleware to be wired in public/index.php or the app refuses
+// to boot. This skeleton's public/index.php already does this for you based
+// on this file's `mode`/`server` settings — see its comment block.
 return [
     // Auth mode:
     //   'builtin'  — StoneScriptPHP issues/validates its own JWTs (RSA keys in ./keys/)

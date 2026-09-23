@@ -24,6 +24,20 @@ use App\Routes\Auth\TokenExchangeRoute;
  *
  * A bare classname value (no array) is also accepted — shorthand for
  * ['handler' => X::class, 'service' => 'shared', 'is_public' => false].
+ *
+ * Framework v7.0.0+ typed access model (see UPGRADING-7.0.md):
+ * `is_public` still works and is the recommended shorthand for public routes,
+ * but every route now also carries an `access` value derived from it —
+ * `is_public => true` resolves to `access: public`; any other route (the
+ * default) resolves to `access: authorization`. The moment you add your
+ * first non-public route here (or enable a framework auth feature like
+ * `change_password`/`profile` in config/auth.php, which are non-public by
+ * default), Application::run() REQUIRES the typed-auth middleware to be
+ * wired or it refuses to boot (AuthWiringException). This skeleton's
+ * public/index.php already wires AccessTokenMiddleware for you — see the
+ * comment block there before adding a protected route. Use explicit
+ * `'access' => 'authorization', 'token_type' => 'access'` on a route only if
+ * you need to override the is_public-derived default.
  */
 return [
     'GET' => [
