@@ -119,6 +119,10 @@ $commands = [
         'description' => 'Provision a per-platform bearer token required by gateway v4.1.0+',
         'file' => 'cli/gateway-provision-token.php',
     ],
+    'gateway:provision-audit' => [
+        'description' => 'One-time: provision {platform}_audit (SIMPLE audit-DB design, gateway v4.5.0+)',
+        'file' => 'cli/gateway-provision-audit.php',
+    ],
     'gateway:list-schemas' => [
         'description' => 'List schema archives registered on the gateway for this platform',
         'file' => 'cli/gateway-list-schemas.php',
@@ -134,6 +138,27 @@ $command = $argv[1] ?? 'help';
 $args = array_slice($argv, 2);
 
 // Special handling for 'generate' with sub-commands
+//
+// $generateFellThrough tracks whether $subCommand matched none of the
+// special cases below and is therefore about to fall through to the generic
+// cli/generate-dispatcher.php (its default file, set in $commands['generate']
+// above). That file has its OWN $generators map keyed by subcommand (e.g.
+// 'android-server') and reads $argv[1] itself to look up the right generator
+// — so unlike the special-cased subcommands below (which ARE redirected to a
+// specific file and whose *own* argv parsing starts at the NEXT token), the
+// fallthrough case must NOT have its subcommand token stripped. See the
+// $scriptArgs computation below, which this flag feeds.
+//
+// Bug fixed 2026-08-12: prior to this, $scriptArgs stripped $args[0]
+// unconditionally whenever $command === 'generate', regardless of whether a
+// special case matched. Every subcommand added to generate-dispatcher.php's
+// $generators map WITHOUT also adding a special case here (first hit:
+// 'android-server') silently lost its subcommand token before
+// generate-dispatcher.php ever saw it, so `php stone generate android-server`
+// printed generic dispatcher help instead of running anything — confirmed
+// live. Fixing the flag here fixes every current and future such subcommand,
+// not just this one instance.
+$generateFellThrough = false;
 if ($command === 'generate' && !empty($args)) {
     $subCommand = $args[0];
 
@@ -149,6 +174,16 @@ if ($command === 'generate' && !empty($args)) {
         $commands['generate']['file'] = 'cli/generate-route.php';
     } elseif ($subCommand === 'model') {
         $commands['generate']['file'] = 'cli/generate-model.php';
+    } elseif ($subCommand === 'invitations') {
+        $commands['generate']['file'] = 'cli/generate-invitations.php';
+    } elseif ($subCommand === 'tenant-governance') {
+        $commands['generate']['file'] = 'cli/generate-tenant-governance.php';
+    } elseif ($subCommand === 'audit') {
+        $commands['generate']['file'] = 'cli/generate-audit.php';
+    } elseif ($subCommand === 'soft-delete') {
+        $commands['generate']['file'] = 'cli/generate-soft-delete.php';
+    } elseif ($subCommand === 'data-export') {
+        $commands['generate']['file'] = 'cli/generate-data-export.php';
     } elseif ($subCommand === 'client') {
         $commands['generate']['file'] = 'cli/generate-client.php';
     } elseif ($subCommand === 'contract') {
@@ -157,6 +192,10 @@ if ($command === 'generate' && !empty($args)) {
         $commands['generate']['file'] = 'cli/generate-env.php';
     } elseif ($subCommand === 'jwt') {
         $commands['generate']['file'] = 'cli/generate-jwt-keys.php';
+    } else {
+        // No special case matched (e.g. 'android-server') — falls through to
+        // the generic cli/generate-dispatcher.php default.
+        $generateFellThrough = true;
     }
 }
 
@@ -176,6 +215,11 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "  php stone generate model get_user.pgsql # Generate model from PostgreSQL function\n";
     echo "  php stone generate contract             # Generate contracts from routes\n";
     echo "  php stone generate client               # Generate TypeScript client\n";
+    echo "  php stone generate invitations          # Scaffold a platform-owned invitation system\n";
+    echo "  php stone generate tenant-governance    # Scaffold platform-owned tenant membership + governance\n";
+    echo "  php stone generate audit                # Scaffold immutable append-only audit log + capture trigger\n";
+    echo "  php stone generate soft-delete          # Scaffold soft-delete columns + 7-day purge + read filters\n";
+    echo "  php stone generate data-export          # Scaffold async streaming data-export jobs + worker\n";
     echo "  php stone generate auth:google          # Generate Google OAuth\n";
     echo "  php stone generate cache:redis          # Generate Redis caching\n";
     echo "  php stone generate jwt                  # Generate JWT RSA keys\n";
@@ -190,6 +234,7 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "  php stone gateway:migrate-tenant --database-id=<uuid>  # Migrate ONE tenant database\n";
     echo "  php stone gateway:migrate-all-tenants                  # Migrate ALL tenant databases\n";
     echo "  php stone gateway:provision-token                      # Provision DB_GATEWAY_PLATFORM_TOKEN\n";
+    echo "  php stone gateway:provision-audit                     # One-time: provision {platform}_audit\n";
     echo "  php stone gateway:list-schemas                         # List registered schema archives\n";
     echo "  php stone gateway:list-databases                       # List registered databases\n";
     echo "\n";
@@ -237,8 +282,16 @@ if (isset($cmdInfo['file'])) {
     }
 
     // Pass arguments to the script
-    // For 'generate' commands, skip the sub-command name (route, model, client, etc.)
-    $scriptArgs = ($command === 'generate' && !empty($args)) ? array_slice($args, 1) : $args;
+    // For 'generate' commands redirected to a SPECIFIC generator file above
+    // (route, model, client, etc.), skip the sub-command name — that
+    // generator's own argv parsing starts at the next token. When generate
+    // fell through to the generic cli/generate-dispatcher.php instead (see
+    // $generateFellThrough above), the sub-command name must be PRESERVED —
+    // that dispatcher reads $argv[1] itself to look up its own $generators
+    // map (e.g. 'android-server').
+    $scriptArgs = ($command === 'generate' && !empty($args) && !$generateFellThrough)
+        ? array_slice($args, 1)
+        : $args;
     $_SERVER['argv'] = array_merge([$scriptPath], $scriptArgs);
     $_SERVER['argc'] = count($_SERVER['argv']);
 
