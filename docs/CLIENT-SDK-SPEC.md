@@ -103,7 +103,7 @@ self-containment + URL restructure + all 11 platforms migrate in **one coordinat
 dual-convention period. Guardrail: every platform still passes **factory QC + the un-gitignored-dist
 build-gate before any deploy** — the contract changes all at once, but no platform half-migrates and
 none deploys un-revalidated. 6. **ngx-pay** → depends on `ApiClient`; align with the new
-`stonescriptphp-pay` design.
+`stonescriptphp-payments` design.
 
 ---
 
