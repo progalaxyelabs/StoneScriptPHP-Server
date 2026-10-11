@@ -1,405 +1,137 @@
-# Docker Deployment Guide
+# Docker
 
-This directory contains **sample Docker configurations** for reference. In production, you'll typically have a multi-service setup with your own `docker-compose.yaml` at the project root.
+This project ships `Dockerfile.dev` and `Dockerfile.prod` plus the `docker/` nginx and supervisor
+configs they copy in. It does not ship a compose file: build this directory as one service in your own
+project-level `docker-compose.yaml`.
 
-## Files Overview
+Both images are `php:8.3-fpm-bookworm` with nginx and supervisor (Debian, not Alpine). The container
+listens on port 8000; `GET /health` is the health check.
 
-### Development
-- **`Dockerfile.dev`** - Development image using PHP-FPM + Nginx (with hot reload)
-- **`docker-compose.dev.yaml`** - Sample development setup (PostgreSQL + API)
+| | `Dockerfile.dev` | `Dockerfile.prod` |
+|---|---|---|
+| Build | single stage, dev tools (git, vim, ...), `composer install` with dev packages | multi-stage, runtime packages only |
+| PHP | errors displayed, 512M | OPcache (`validate_timestamps=0`), errors hidden |
+| Runs as | PHP-FPM workers as the owner of the bind-mounted project (`docker/dev-fpm-user.sh`) | `www-data` |
 
-### Production
-- **`Dockerfile.prod`** - Production image using PHP-FPM + Nginx (optimized)
-- **`docker-compose.prod.yaml`** - Sample production setup
-- **`docker/`** - Nginx and Supervisor configurations
+## Development
 
----
+`composer dev` builds `Dockerfile.dev`, mounts the project at `/app` and serves
+http://localhost:8000 (`composer stop`, `composer logs`, `composer shell`, `composer clean`).
 
-## Important: php stone serve vs Docker
-
-**`php stone serve`** is for **non-Docker local development only**:
-- Uses PHP's built-in server (`php -S`)
-- Quick start without Docker: `php stone serve`
-- ❌ **DO NOT use in Docker containers**
-- ❌ **DO NOT use in production**
-
-**Docker setups (both dev and prod)** use **Nginx + PHP-FPM**:
-- Consistent environment dev → prod
-- Production-grade architecture
-- Better performance and security
-- Avoids compatibility issues
-
----
-
-## Development Setup
-
-**For Docker-based development with hot reload**
-
-Both development and production Dockerfiles use PHP-FPM + Nginx. The key differences:
-
-**Development (Debian-based):**
-- Base: `php:8.3-fpm-bookworm` (Debian)
-- Tools: vim, nano, htop, git, telnet, dig, etc. (easy tinkering)
-- PHP: Error display ON, verbose errors, 512M memory
-- Size: ~600MB (includes dev tools)
-- Use case: Local testing, debugging, easy to exec into container
-
-**Production (Alpine-based):**
-- Base: `php:8.3-fpm-alpine` (Alpine Linux)
-- Tools: Minimal runtime only
-- PHP: OPcache enabled, errors hidden, optimized autoloader
-- Size: ~50MB (minimal footprint)
-- Use case: Production deployment, optimized performance
-
-### Quick Start (Development)
+Without Docker, use the PHP built-in server (never in production):
 
 ```bash
-# Start development environment
-docker compose -f docker-compose.dev.yaml up -d
-
-# Run migrations
-docker exec -it stonescriptphp-app php stone migrate up
-
-# Create admin user
-docker exec -it stonescriptphp-app php stone create:admin
-
-# View logs
-docker compose -f docker-compose.dev.yaml logs -f app
+php -S 127.0.0.1:9100 -t public public/index.php
 ```
 
----
-
-## Production Setup
-
-**✅ Production-ready with PHP-FPM + Nginx**
-
-The production setup uses:
-- **PHP-FPM** - FastCGI Process Manager for high performance
-- **Nginx** - Industry-standard web server
-- **Supervisor** - Process manager for PHP-FPM + Nginx
-- **OPcache** - Optimized bytecode caching
-- **Alpine Linux** - Minimal footprint (~50MB base image)
-
-### Build Production Image
+## Production
 
 ```bash
-# Build the production image
-docker build -f Dockerfile.prod -t stonescriptphp-api:latest .
-
-# Or with docker-compose
-docker compose -f docker-compose.prod.yaml build
+docker build -f Dockerfile.prod -t my-api:latest .
 ```
 
-### Deploy to Production
-
-```bash
-# Start production environment
-docker compose -f docker-compose.prod.yaml up -d
-
-# Run migrations
-docker exec -it stonescriptphp-app php stone migrate up
-
-# Check health
-curl http://localhost:8000/api/health
-```
-
----
-
-## Real-World Project Structure
-
-In production, you'll typically have a structure like this:
-
-```
-my-project/
-├── docker-compose.yaml          # Your main compose file
-├── .env                          # Environment variables
-├── api/                          # This StoneScriptPHP API
-│   ├── src/
-│   ├── public/
-│   ├── Dockerfile.prod          # Use the production Dockerfile
-│   └── composer.json
-├── www/                          # Frontend (React/Angular/etc)
-│   ├── nginx.conf
-│   └── Dockerfile
-├── worker/                       # Background workers
-│   └── Dockerfile
-└── db/
-    └── init.sql
-```
-
-### Sample Project-Level docker-compose.yaml
+A minimal service in your compose file (the API talks to the StoneScriptDB Gateway, never to
+PostgreSQL directly). `.env` is not in the image (see `.dockerignore`), so everything the app needs
+must be in `environment:` or secrets, including `AUTH_MODE`: without it the framework default
+`builtin` applies, and every token from your auth service is refused with 401 while `/health` still
+answers 200.
 
 ```yaml
-version: '3.8'
-
 services:
-  # Database
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: myapp
-      POSTGRES_USER: myapp
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - myapp-network
-
-  # API (StoneScriptPHP)
   api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile.prod
+    image: my-api:latest
     environment:
-      DATABASE_HOST: postgres
-      DATABASE_DBNAME: myapp
       APP_ENV: production
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - myapp-network
+      DEBUG_MODE: "false"
+      DB_GATEWAY_URL: http://gateway:9000
+      DB_GATEWAY_PLATFORM: your-platform-code
+      DB_GATEWAY_SCHEMA_NAME: main
+      JWT_ISSUER: https://api.yourdomain.com
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
+      AUTH_MODE: external                     # external | hybrid | builtin; same value as in .env.example
+      AUTH_SERVICE_URL: http://auth:3139      # external/hybrid
+      AUTH_ISSUER: https://auth.yourdomain.com
+      PLATFORM_CODE: your-platform-code
+      TRUSTED_PROXIES: 172.18.0.2             # your reverse proxy, explicit address or CIDR
+    secrets:
+      - source: jwt_private_key
+        target: jwt-private.pem
+        uid: "33"
+        gid: "33"
+        mode: 0400
+      - source: jwt_public_key
+        target: jwt-public.pem
+        uid: "33"
+        gid: "33"
+        mode: 0444
 
-  # Frontend
-  www:
-    build: ./www
-    ports:
-      - "80:80"
-      - "443:443"
-    depends_on:
-      - api
-    networks:
-      - myapp-network
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    networks:
-      - myapp-network
-
-  # Background Worker
-  worker:
-    build: ./worker
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - myapp-network
-
-volumes:
-  postgres_data:
-
-networks:
-  myapp-network:
-    driver: bridge
+secrets:
+  jwt_private_key:
+    file: ./keys/jwt-private.pem
+  jwt_public_key:
+    file: ./keys/jwt-public.pem
 ```
 
----
+`uid`, `gid` and `mode` on a secret are applied by Swarm; plain `docker compose` bind-mounts the host
+file with the host's owner and mode (see below). `docker compose config` validates the file.
 
-## Environment Variables
+`.env.example` documents every variable; allowed origins live in `src/config/allowed-origins.php`.
+Run `php stone env:check` as the PHP-FPM user before you deploy.
 
-### Required
+### The JWT signing key: mount it, never bake it
 
-```env
-# Database
-DB_DATABASE=stonescriptphp
-DB_USERNAME=postgres
-DB_PASSWORD=your-secure-password
+`keys/`, `*.pem`, `*.key`, `.env` and `.env.*` (except `.env.example`) are in `.dockerignore`, so
+neither the signing key nor your environment is in the image. The production workers run as
+`www-data` (uid 33), so the mounted private key must be readable by uid 33 and by no one else:
 
-# JWT
-JWT_SECRET=your-jwt-secret
-JWT_ISSUER=your-domain.com
+- **Docker Swarm / Kubernetes secrets:** set the owner and mode on the secret
+  (Swarm long syntax `uid: "33"`, `gid: "33"`, `mode: 0400`; Kubernetes `fsGroup`/`defaultMode`).
+- **Plain `docker compose`** (file-based secrets are bind mounts that keep the host file's owner and
+  mode, so a `0600` key owned by your user is unreadable inside the container): on the host,
+  `sudo chown 33:33 keys/jwt-private.pem && chmod 0400 keys/jwt-private.pem`, or keep your owner and
+  give group 33 read access with `chgrp 33 keys/jwt-private.pem && chmod 0440 keys/jwt-private.pem`.
+  Never `0644`.
 
-# CORS
-ALLOWED_ORIGINS=https://yourdomain.com
-```
+Development is different on purpose: the key stays `0600` on your machine and the dev container
+runs PHP-FPM as the owner of the bind-mounted project (`docker/dev-fpm-user.sh`), so nothing is made
+group- or world-readable.
 
-### Optional
+### Reverse proxy
 
-```env
-# Redis (if enabled)
-REDIS_ENABLED=true
-REDIS_HOST=redis
-REDIS_PORT=6379
+The container's nginx is an inner nginx: it passes `X-Forwarded-For` through unchanged, and PHP trusts
+it only from the addresses in `TRUSTED_PROXIES`. Without `TRUSTED_PROXIES` every visitor behind a
+proxy shares one rate-limit bucket and the site answers HTTP 429. Your outer proxy must overwrite
+`X-Forwarded-For` with the address it saw (the framework's `docs/CLIENT-IP-AND-NGINX-STANDARD.md`, 3b).
 
-# OAuth
-GOOGLE_CLIENT_ID=your-client-id
-GOOGLE_CLIENT_SECRET=your-client-secret
+## Production checklist
 
-# Email
-ZEPTOMAIL_SEND_MAIL_TOKEN=your-token
-ZEPTOMAIL_SENDER_EMAIL=noreply@yourdomain.com
-```
+- `Dockerfile.prod`, `APP_ENV=production`, `DEBUG_MODE=false`
+- `JWT_ISSUER` set to your API URL; signing key mounted as a secret
+- real origins in `src/config/allowed-origins.php`, then `php stone auth:check-origins`
+- `TRUSTED_PROXIES` set to your reverse proxy
+- HTTPS terminated at the load balancer or outer nginx
+- `php stone env:check` passes as the PHP-FPM user
 
----
-
-## Performance Tuning
-
-### PHP-FPM Configuration
-
-Edit `docker/supervisord.conf` or override in Dockerfile.prod:
-
-```ini
-# In Dockerfile.prod
-pm = dynamic
-pm.max_children = 50          # Max concurrent PHP processes
-pm.start_servers = 5          # Initial processes
-pm.min_spare_servers = 5      # Minimum idle processes
-pm.max_spare_servers = 35     # Maximum idle processes
-pm.max_requests = 500         # Restart worker after N requests
-```
-
-### OPcache Configuration
-
-OPcache is pre-configured in production. To adjust:
-
-```ini
-opcache.memory_consumption=256        # Increase for large apps
-opcache.max_accelerated_files=10000   # Increase if needed
-opcache.validate_timestamps=0         # Disable for production
-```
-
-### Nginx Tuning
-
-Edit `docker/nginx.conf`:
-
-```nginx
-worker_processes auto;           # CPU cores
-worker_connections 2048;         # Concurrent connections per worker
-client_max_body_size 20M;       # Max upload size
-```
-
----
-
-## Monitoring & Logs
-
-### View Logs
+## Logs and health
 
 ```bash
-# Application logs
-docker logs -f stonescriptphp-app
-
-# Nginx access logs
-docker exec stonescriptphp-app tail -f /var/log/nginx/access.log
-
-# Nginx error logs
-docker exec stonescriptphp-app tail -f /var/log/nginx/error.log
-
-# PHP errors
-docker exec stonescriptphp-app tail -f /var/log/php_errors.log
+docker logs -f <container>                          # application and nginx
+docker exec <container> tail -f /var/log/php_errors.log
+curl http://localhost:8000/health
 ```
-
-### Health Checks
-
-```bash
-# Check container health
-docker ps
-
-# Test health endpoint
-curl http://localhost:8000/api/health
-
-# Check PHP-FPM status
-docker exec stonescriptphp-app ps aux | grep php-fpm
-```
-
----
-
-## Security Considerations
-
-### Production Checklist
-
-- ✅ Use `Dockerfile.prod` (not `Dockerfile.dev`)
-- ✅ Set `APP_ENV=production` and `DEBUG_MODE=false`
-- ✅ Use strong passwords for database
-- ✅ Generate secure JWT_SECRET (minimum 32 characters)
-- ✅ Set ALLOWED_ORIGINS to your actual domain
-- ✅ Keep JWT keys secure (mount as read-only)
-- ✅ Run containers as non-root user (www-data)
-- ✅ Use HTTPS in production (terminate at load balancer or nginx)
-- ✅ Keep Docker images updated
-- ✅ Use Docker secrets for sensitive data (Swarm/Kubernetes)
-
-### File Permissions
-
-```bash
-# JWT keys should be read-only
-chmod 600 keys/jwt-private.pem
-chmod 644 keys/jwt-public.pem
-chown www-data:www-data keys/*.pem
-```
-
----
 
 ## Troubleshooting
 
-### "STDERR not found" Error
+- **Container exits or answers 500 `env_configuration_invalid`:** a required value in `.env` is empty
+  or `.env` is unreadable. Run `php stone env:check` inside the container.
+- **Token minting returns 500 in a container:** the private key is not readable by the PHP-FPM user (see above).
+- **Port in use:** `sudo lsof -i :8000`.
+- **Rebuild without cache:** `docker build --no-cache -f Dockerfile.prod -t my-api .`
 
-✅ **Fixed in Logger.php** - Now uses `php://stderr` instead of `\STDERR` constant
-
-### Container Won't Start
-
-```bash
-# Check logs
-docker logs stonescriptphp-app
-
-# Check if port is in use
-sudo lsof -i :8000
-
-# Rebuild without cache
-docker build --no-cache -f Dockerfile.prod -t stonescriptphp-api .
-```
-
-### Database Connection Issues
-
-```bash
-# Test database connectivity
-docker exec stonescriptphp-app nc -zv postgres 5432
-
-# Check environment variables
-docker exec stonescriptphp-app env | grep DATABASE
-```
-
----
-
-## CI/CD Integration
-
-### GitHub Actions Example
+## CI
 
 ```yaml
-name: Build and Deploy
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Build Docker image
-        run: docker build -f Dockerfile.prod -t myapp-api:${{ github.sha }} .
-
-      - name: Push to registry
-        run: |
-          docker tag myapp-api:${{ github.sha }} registry.example.com/myapp-api:latest
-          docker push registry.example.com/myapp-api:latest
+- name: Build image
+  run: docker build -f Dockerfile.prod -t my-api:${{ github.sha }} .
 ```
-
----
-
-## Additional Resources
-
-- [PHP-FPM Documentation](https://www.php.net/manual/en/install.fpm.php)
-- [Nginx Configuration](https://nginx.org/en/docs/)
-- [Docker Best Practices](https://docs.docker.com/develop/dev-best-practices/)
-- [StoneScriptPHP Documentation](https://github.com/progalaxyelabs/StoneScriptPHP)
-
----
-
-## Questions?
-
-- Framework: [StoneScriptPHP Issues](https://github.com/progalaxyelabs/StoneScriptPHP/issues)
-- Server: [StoneScriptPHP-Server Issues](https://github.com/progalaxyelabs/StoneScriptPHP-Server/issues)

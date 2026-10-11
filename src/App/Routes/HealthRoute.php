@@ -4,8 +4,14 @@ namespace App\Routes;
 
 use StoneScriptPHP\ApiResponse;
 use StoneScriptPHP\IRouteHandler;
-use StoneScriptPHP\Database;
 
+/**
+ * Health check route.
+ *
+ * Deliberately does NOT check database/gateway connectivity: this endpoint
+ * backs Docker liveness probes, and a DB blip should not cascade into
+ * a container restart loop.
+ */
 class HealthRoute implements IRouteHandler
 {
     function validation_rules(): array
@@ -15,21 +21,9 @@ class HealthRoute implements IRouteHandler
 
     function process(): ApiResponse
     {
-        $health = [
+        return res_ok([
             'status' => 'healthy',
             'timestamp' => date('c'),
-            'checks' => []
-        ];
-
-        // Check database connection
-        try {
-            Database::query("SELECT 1");
-            $health['checks']['database'] = 'ok';
-        } catch (\Exception $e) {
-            $health['status'] = 'unhealthy';
-            $health['checks']['database'] = 'failed';
-        }
-
-        return res_ok($health, 'Health check');
+        ], 'Health check');
     }
 }

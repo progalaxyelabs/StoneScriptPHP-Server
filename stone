@@ -31,7 +31,7 @@ define('IS_VENDOR_MODE', $isVendorMode);
 // Define project paths
 // SRC_PATH points to the project's src/ directory (where App\ namespace lives)
 define('SRC_PATH', ROOT_PATH . 'src' . DIRECTORY_SEPARATOR);
-define('CONFIG_PATH', SRC_PATH . 'App' . DIRECTORY_SEPARATOR . 'Config' . DIRECTORY_SEPARATOR);
+define('CONFIG_PATH', SRC_PATH . 'config' . DIRECTORY_SEPARATOR);
 
 require_once $projectRoot . '/vendor/autoload.php';
 
@@ -87,6 +87,26 @@ $commands = [
         'description' => 'Create system administrator user',
         'file' => 'cli/create-admin.php',
     ],
+    'auth:purge-refresh-tokens' => [
+        'description' => 'Delete expired refresh-token rows in batches (schedule hourly/daily)',
+        'file' => 'cli/auth-purge-refresh-tokens.php',
+    ],
+    'env:check' => [
+        'description' => 'Load the environment exactly as the app does and fail with the reason if it would not boot (run as the PHP-FPM user)',
+        'file' => 'cli/env-check.php',
+    ],
+    'auth:check-origins' => [
+        'description' => 'List the origins allowed to receive the Google sign-in popup result; fails if none (run before deploying)',
+        'file' => 'cli/auth-check-origins.php',
+    ],
+    'auth:check-refresh-store' => [
+        'description' => 'Check the refresh-token vendor schema is applied (run before REFRESH_TOKEN_STORE=postgres)',
+        'file' => 'cli/auth-check-refresh-store.php',
+    ],
+    'tenants:check-ids' => [
+        'description' => 'Read-only pre-flight: list stored tenant ids that fail the tenant-id rule or collide (pipe ids in)',
+        'file' => 'cli/tenants-check-ids.php',
+    ],
     'schema:export' => [
         'description' => 'Export postgresql folder as tar.gz for db-gateway',
         'file' => 'cli/schema-export.php',
@@ -103,6 +123,10 @@ $commands = [
         'description' => 'Migrate main database schema via gateway',
         'file' => 'cli/gateway-migrate-main.php',
     ],
+    'gateway:migrate-vendor-main' => [
+        'description' => 'Activate opt-in framework schema staged in src/postgresql/vendor/ (never automatic — see file header)',
+        'file' => 'cli/gateway-migrate-vendor-main.php',
+    ],
     'gateway:migrate-tenant' => [
         'description' => 'Migrate ONE tenant database (--database-id required)',
         'file' => 'cli/gateway-migrate-tenant.php',
@@ -114,6 +138,10 @@ $commands = [
     'gateway:provision-token' => [
         'description' => 'Provision a per-platform bearer token required by gateway v4.1.0+',
         'file' => 'cli/gateway-provision-token.php',
+    ],
+    'gateway:provision-audit' => [
+        'description' => 'One-time: provision {platform}_audit (SIMPLE audit-DB design, gateway v4.5.0+)',
+        'file' => 'cli/gateway-provision-audit.php',
     ],
     'gateway:list-schemas' => [
         'description' => 'List schema archives registered on the gateway for this platform',
@@ -130,6 +158,27 @@ $command = $argv[1] ?? 'help';
 $args = array_slice($argv, 2);
 
 // Special handling for 'generate' with sub-commands
+//
+// $generateFellThrough tracks whether $subCommand matched none of the
+// special cases below and is therefore about to fall through to the generic
+// cli/generate-dispatcher.php (its default file, set in $commands['generate']
+// above). That file has its OWN $generators map keyed by subcommand (e.g.
+// 'android-server') and reads $argv[1] itself to look up the right generator
+// — so unlike the special-cased subcommands below (which ARE redirected to a
+// specific file and whose *own* argv parsing starts at the NEXT token), the
+// fallthrough case must NOT have its subcommand token stripped. See the
+// $scriptArgs computation below, which this flag feeds.
+//
+// Bug fixed 2026-08-12: prior to this, $scriptArgs stripped $args[0]
+// unconditionally whenever $command === 'generate', regardless of whether a
+// special case matched. Every subcommand added to generate-dispatcher.php's
+// $generators map WITHOUT also adding a special case here (first hit:
+// 'android-server') silently lost its subcommand token before
+// generate-dispatcher.php ever saw it, so `php stone generate android-server`
+// printed generic dispatcher help instead of running anything — confirmed
+// live. Fixing the flag here fixes every current and future such subcommand,
+// not just this one instance.
+$generateFellThrough = false;
 if ($command === 'generate' && !empty($args)) {
     $subCommand = $args[0];
 
@@ -145,6 +194,16 @@ if ($command === 'generate' && !empty($args)) {
         $commands['generate']['file'] = 'cli/generate-route.php';
     } elseif ($subCommand === 'model') {
         $commands['generate']['file'] = 'cli/generate-model.php';
+    } elseif ($subCommand === 'invitations') {
+        $commands['generate']['file'] = 'cli/generate-invitations.php';
+    } elseif ($subCommand === 'tenant-governance') {
+        $commands['generate']['file'] = 'cli/generate-tenant-governance.php';
+    } elseif ($subCommand === 'audit') {
+        $commands['generate']['file'] = 'cli/generate-audit.php';
+    } elseif ($subCommand === 'soft-delete') {
+        $commands['generate']['file'] = 'cli/generate-soft-delete.php';
+    } elseif ($subCommand === 'data-export') {
+        $commands['generate']['file'] = 'cli/generate-data-export.php';
     } elseif ($subCommand === 'client') {
         $commands['generate']['file'] = 'cli/generate-client.php';
     } elseif ($subCommand === 'contract') {
@@ -153,6 +212,10 @@ if ($command === 'generate' && !empty($args)) {
         $commands['generate']['file'] = 'cli/generate-env.php';
     } elseif ($subCommand === 'jwt') {
         $commands['generate']['file'] = 'cli/generate-jwt-keys.php';
+    } else {
+        // No special case matched (e.g. 'android-server') — falls through to
+        // the generic cli/generate-dispatcher.php default.
+        $generateFellThrough = true;
     }
 }
 
@@ -172,6 +235,11 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "  php stone generate model get_user.pgsql # Generate model from PostgreSQL function\n";
     echo "  php stone generate contract             # Generate contracts from routes\n";
     echo "  php stone generate client               # Generate TypeScript client\n";
+    echo "  php stone generate invitations          # Scaffold a platform-owned invitation system\n";
+    echo "  php stone generate tenant-governance    # Scaffold platform-owned tenant membership + governance\n";
+    echo "  php stone generate audit                # Scaffold immutable append-only audit log + capture trigger\n";
+    echo "  php stone generate soft-delete          # Scaffold soft-delete columns + 7-day purge + read filters\n";
+    echo "  php stone generate data-export          # Scaffold async streaming data-export jobs + worker\n";
     echo "  php stone generate auth:google          # Generate Google OAuth\n";
     echo "  php stone generate cache:redis          # Generate Redis caching\n";
     echo "  php stone generate jwt                  # Generate JWT RSA keys\n";
@@ -179,12 +247,15 @@ if ($command === 'help' || $command === '--help' || $command === '-h') {
     echo "  php stone validate sqlintegrity         # Check SQL for undefined table/fn refs\n";
     echo "  php stone tenant:create \"Acme\" acme    # Create new tenant\n";
     echo "  php stone tenant:list                   # List all tenants\n";
+    echo "  php stone auth:purge-refresh-tokens      # Purge expired refresh tokens (cron)\n";
     echo "  php stone gateway:register-main          # Register platform + create main DB\n";
     echo "  php stone gateway:register-tenant        # Register platform + upload tenant schema\n";
     echo "  php stone gateway:migrate-main                          # Migrate main database schema\n";
+    echo "  php stone gateway:migrate-vendor-main [--list] [--only=A,B]  # Activate opt-in vendor schema (never automatic); --only picks features\n";
     echo "  php stone gateway:migrate-tenant --database-id=<uuid>  # Migrate ONE tenant database\n";
     echo "  php stone gateway:migrate-all-tenants                  # Migrate ALL tenant databases\n";
     echo "  php stone gateway:provision-token                      # Provision DB_GATEWAY_PLATFORM_TOKEN\n";
+    echo "  php stone gateway:provision-audit                     # One-time: provision {platform}_audit\n";
     echo "  php stone gateway:list-schemas                         # List registered schema archives\n";
     echo "  php stone gateway:list-databases                       # List registered databases\n";
     echo "\n";
@@ -232,8 +303,16 @@ if (isset($cmdInfo['file'])) {
     }
 
     // Pass arguments to the script
-    // For 'generate' commands, skip the sub-command name (route, model, client, etc.)
-    $scriptArgs = ($command === 'generate' && !empty($args)) ? array_slice($args, 1) : $args;
+    // For 'generate' commands redirected to a SPECIFIC generator file above
+    // (route, model, client, etc.), skip the sub-command name — that
+    // generator's own argv parsing starts at the next token. When generate
+    // fell through to the generic cli/generate-dispatcher.php instead (see
+    // $generateFellThrough above), the sub-command name must be PRESERVED —
+    // that dispatcher reads $argv[1] itself to look up its own $generators
+    // map (e.g. 'android-server').
+    $scriptArgs = ($command === 'generate' && !empty($args) && !$generateFellThrough)
+        ? array_slice($args, 1)
+        : $args;
     $_SERVER['argv'] = array_merge([$scriptPath], $scriptArgs);
     $_SERVER['argc'] = count($_SERVER['argv']);
 

@@ -2,7 +2,7 @@
     "name": "progalaxyelabs/stonescriptphp-server",
     "description": "Application skeleton for StoneScriptPHP. Ready-to-use project template with CLI tools, folder structure, and examples. Includes the stonescriptphp framework as a dependency.",
     "type": "project",
-    "version": "3.22.0",
+    "version": "5.0.0",
     "license": "MIT",
     "keywords": [
         "stonescriptphp",
@@ -28,10 +28,10 @@
     ],
     "require": {
         "php": "^8.2",
-        "progalaxyelabs/stonescriptphp": "^5.1"
+        "progalaxyelabs/stonescriptphp": "^12.1"
     },
     "suggest": {
-        "progalaxyelabs/stonescriptphp-pay": "Payment provider abstraction (Razorpay driver included). Required for selling platforms that accept payments."
+        "progalaxyelabs/stonescriptphp-payments": "Payments + invoicing package (Razorpay/PayPal drivers, GST-aware invoicing). Required for selling platforms that accept payments."
     },
     "require-dev": {
         "phpstan/phpstan": "^2.1",
@@ -50,18 +50,20 @@
     "bin": ["stone"],
     "scripts": {
         "post-install-cmd": [
-            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\""
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\"",
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/cli/sync-vendor-schema.php')) { include 'vendor/progalaxyelabs/stonescriptphp/cli/sync-vendor-schema.php'; }\""
         ],
         "post-update-cmd": [
-            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\""
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/stone')) { copy('vendor/progalaxyelabs/stonescriptphp/stone', 'stone'); chmod('stone', 0755); echo '✅ Updated stone CLI from framework\\n'; }\"",
+            "@php -r \"if (file_exists('vendor/progalaxyelabs/stonescriptphp/cli/sync-vendor-schema.php')) { include 'vendor/progalaxyelabs/stonescriptphp/cli/sync-vendor-schema.php'; }\""
         ],
         "post-create-project-cmd": [
-            "@php stone setup"
+            "@php scripts/post-create-project.php"
         ],
         "dev": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php -r \"passthru('docker build -t stonescriptphp-dev -f Dockerfile.dev . 2>&1 | grep -q \\\"Successfully built\\\" || docker build -t stonescriptphp-dev -f Dockerfile.dev .');\"",
-            "@php -r \"passthru('docker run -d --name stonescriptphp-dev -p 8000:8000 -v \\\"' . getcwd() . ':/app\\\" --env-file .env stonescriptphp-dev 2>&1');\"",
+            "docker build -t stonescriptphp-dev -f Dockerfile.dev .",
+            "@php -r \"passthru('docker run -d --name stonescriptphp-dev -p 8000:8000 -v \\\"' . getcwd() . ':/app\\\" stonescriptphp-dev 2>&1');\"",
             "@php -r \"echo '\\n\\033[0;32m✓ Development server started!\\033[0m\\n';\"",
             "@php -r \"echo '  Access at: http://localhost:8000\\n';\"",
             "@php -r \"echo '  Stop: composer stop\\n';\"",
@@ -95,7 +97,7 @@
             "@php -r \"echo '\\n\\033[0;33m⚠ Container and image removed\\033[0m\\n\\n';\""
         ],
         "test": "phpunit",
-        "migrate": "php stone migrate"
+        "migrate": "( set -a; . ./.env; set +a; php stone gateway:migrate-main )"
     },
     "config": {
         "sort-packages": true,
@@ -106,11 +108,11 @@
         "exclude": [
             "/local-tests",
             "/.github",
-            "/tests",
             "/docs",
             "/.git",
             "/.env",
             "/.env.*",
+            "!/.env.example",
             "*.pem",
             "*.pub",
             "*.key",

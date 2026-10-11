@@ -1,35 +1,45 @@
 <?php
 
+// Typed-auth note (framework v7.0.0+): with mode = 'external'/'hybrid', the
+// framework's ExternalAuthRoutes registers some routes as non-public by default
+// (e.g. `change_password`, `profile` below). Those require the typed-auth
+// AccessTokenMiddleware to be wired in public/index.php or the app refuses to
+// boot. This skeleton's src/config/application.php already does that from the values
+// resolved here and in .env.
+//
+// Single source of truth: every value left as `null` below is resolved from
+// the environment (.env) by the framework, so the file and .env cannot
+// disagree. Set a value here only to pin it in code.
 return [
     // Auth mode:
     //   'builtin'  — StoneScriptPHP issues/validates its own JWTs (RSA keys in ./keys/)
-    //   'external' — delegate all auth to a separate auth service (progalaxyelabs-auth or custom)
+    //   'external' — delegate all auth to a separate auth service (an external auth service or custom)
     //   'hybrid'   — validate external JWTs + optionally issue own tokens
-    'mode' => 'external',
+    // null = read AUTH_MODE from .env (the shipped .env.example sets 'external').
+    'mode' => null,
 
-    // URL prefix for all registered auth routes — AUTH-SPEC §S1 canonical prefix is /api/auth.
-    // When legacy_compat is true (the default), routes are ALSO answered on the old /auth prefix
-    // so existing Angular clients keep working during migration. Set legacy_compat => false once
-    // all clients have been updated to call /api/auth/*.
+    // URL prefix for all registered auth routes — the canonical prefix is /api/auth.
+    // (legacy /auth prefix: see `legacy_compat` under 'features' below.)
     'prefix' => '/api/auth',
-    'legacy_compat' => true,
 
     // Platform identity — sent in every request to the auth service
     'platform' => [
-        'code'   => 'myapp',    // Required: matches PLATFORM_CODE in auth service
+        'code'   => null,       // null = PLATFORM_CODE from .env. Must match the code registered in the auth service
         'secret' => null,       // Falls back to EXTERNAL_AUTH_CLIENT_SECRET env var. Used as X-Platform-Secret header for privileged endpoints (register-tenant)
     ],
 
     'server' => [
         // JWKS fetch URL — use container-internal hostname in Docker (e.g. http://auth-service:3139)
-        'url' => 'http://localhost:3139',
+        // null = AUTH_SERVICE_URL from .env.
+        'url' => null,
 
         // JWT 'iss' claim value — must match exactly what the auth server stamps in tokens.
         // In Docker: AUTH_SERVICE_URL = container URL, AUTH_ISSUER = public URL the server stamps.
-        // Leave empty to fall back to 'url' (single-host / local dev).
-        'issuer' => '',
+        // null = resolved from AUTH_ISSUER env var at runtime (set AUTH_ISSUER in .env).
+        // NEVER set to '' — framework v5.2 throws RuntimeException at boot on empty string.
+        'issuer' => null,
 
-        // Override auth service endpoint paths if they differ from progalaxyelabs-auth defaults.
+        // Override auth service endpoint paths if they differ from your auth service's defaults.
         // Only set entries that differ — unset entries use the defaults shown here.
         'paths' => [
             'jwks'              => '/api/auth/jwks',
@@ -66,6 +76,7 @@ return [
         'login'             => true,
         'logout'            => true,
         'refresh'           => true,
+        'exchange'          => true,
         'select_tenant'     => true,
         'memberships'       => true,
         'check_slug'        => true,
@@ -79,6 +90,12 @@ return [
         'oauth'             => false,
         'profile'           => true,
         'health'            => false,
+
+        // Also answer every route on the old /auth prefix, for clients written before the prefix
+        // moved to /api/auth. A new project has no such clients, so it is off (while on, the
+        // framework logs a deprecation warning on every request). It lives in this list because
+        // Application::run() only forwards the keys of this list to the auth routes.
+        'legacy_compat'     => false,
     ],
 
     // Lifecycle hooks — called on successful auth events.
@@ -95,29 +112,19 @@ return [
     ],
 
     // ─────────────────────────────────────────────────────────────────────────────
-    // Platform JWT Configuration (for token exchange flow)
+    // Token exchange (identity token -> API token) is provided by the framework:
+    // POST {prefix}/exchange (feature 'exchange', on by default). Do not add a route
+    // of your own at that path. Supply your tenant and role lookups here:
+    //
+    //   'tenants_resolver' => fn(array $authClaims): array => [...],      // tenants of this identity
+    //   'roles_resolver'   => fn(array $claimsWithTenant): array => [...], // roles in that tenant
+    //
+    // SET BOTH. Without a tenants_resolver the route trusts the `tenant_id` in the request body,
+    // so a roles_resolver that does not itself check that the identity belongs to that tenant
+    // lets any signed-in user mint an API token for ANY tenant. Without a roles_resolver the
+    // route answers 501 and no API token is issued.
+    //
+    // The API token is signed with the app's own JWT keypair (JWT_PRIVATE_KEY_PATH,
+    // created by `php stone setup`).
     // ─────────────────────────────────────────────────────────────────────────────
-    //
-    // Used by POST /api/auth/exchange to issue platform tokens with roles.
-    //
-    // Generate keys:
-    //   openssl genrsa -out keys/platform-private.pem 2048
-    //   openssl rsa -in keys/platform-private.pem -pubout -out keys/platform-public.pem
-    //
-    'platform_jwt' => [
-        // Path to RSA private key (for signing platform tokens)
-        'private_key_path' => __DIR__ . '/../../keys/platform-private.pem',
-
-        // Path to RSA public key (for JWKS endpoint, optional)
-        'public_key_path' => __DIR__ . '/../../keys/platform-public.pem',
-
-        // JWT algorithm (RS256, RS384, RS512, ES256, ES384, ES512)
-        'algorithm' => 'RS256',
-
-        // Key ID for JWKS matching (should be unique, rotate when key changes)
-        'key_id' => 'platform-key-1',
-
-        // Token TTL in seconds (default: 1 hour)
-        'ttl' => 3600,
-    ],
 ];

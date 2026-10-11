@@ -13,11 +13,4 @@ require_once ROOT_PATH . 'vendor/autoload.php';
 
 use StoneScriptPHP\Application;
 
-Application::run([
-    'routes'       => require CONFIG_PATH . 'routes.php',
-    'auth'         => require CONFIG_PATH . 'auth.php',
-    'subscription' => require CONFIG_PATH . 'subscription.php',
-    'jwt'          => [
-        'excluded_paths' => require CONFIG_PATH . 'jwt-excluded-paths.php',
-    ],
-]);
+Application::run(require CONFIG_PATH . 'application.php');

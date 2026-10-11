@@ -7,13 +7,15 @@
 *.key
 *-jwt.pem
 *-jwt.pub
-*credentials*
-*secret*
+/credentials*
+/secrets/
+/.secrets/
 
 # Dependencies
 /vendor/
 /node_modules/
-# composer.lock is committed for reproducible builds (this is a project, not a library)
+# composer.lock: commit it in YOUR project (reproducible builds). The skeleton repo itself ships
+# without one so create-project resolves the newest framework 12.x patch.
 
 # IDE & Editors
 /.idea/
@@ -21,7 +23,6 @@
 /.claude/
 /.phpunit.cache/
 /.phpunit.result.cache
-/phpunit.xml
 *.swp
 *.swo
 *~
@@ -45,6 +46,10 @@ logs/*
 *.db
 /postgresql-data/
 
+# Vendor-provided opt-in schema (regenerated on every composer install/update
+# by cli/sync-vendor-schema.php — never hand-edit, never commit)
+/src/postgresql/vendor/
+
 # OS Files
 .DS_Store
 Thumbs.db
@@ -58,5 +63,4 @@ Thumbs.db
 .stone-server-*.pid
 
 # Docker test environment
-test-docker-env/
 .project-id

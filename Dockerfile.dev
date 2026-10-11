@@ -80,8 +80,12 @@ RUN rm -f /etc/nginx/sites-enabled/default \
 # Copy Supervisor configuration
 COPY docker/supervisord-dev.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Dev only: run PHP-FPM workers as the owner of the bind-mounted project (reads the 0600 JWT key)
+COPY docker/dev-fpm-user.sh /usr/local/bin/dev-fpm-user.sh
+RUN chmod +x /usr/local/bin/dev-fpm-user.sh
+
 # Copy composer files first (better layer caching)
-COPY composer.json composer.lock ./
+COPY composer.json composer.lock* ./
 
 # Install dependencies (development mode with dev packages)
 ENV COMPOSER_ALLOW_SUPERUSER=1

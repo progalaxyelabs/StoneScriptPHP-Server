@@ -1,0 +1,7 @@
+# Packagist installs come from GitHub's zipball, which honours export-ignore (and NOT composer.json
+# "archive.exclude"). Keep maintainer-only material out of what `composer create-project` delivers.
+# tests/ ships on purpose: a new project keeps the auth smoke test, so a broken auth wiring shows up.
+/docs                     export-ignore
+/.github                  export-ignore
+/.gitattributes           export-ignore
+/.phpunit.cache           export-ignore

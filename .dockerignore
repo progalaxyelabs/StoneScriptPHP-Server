@@ -35,8 +35,14 @@ logs/*
 
 # Environment files (should be mounted or passed as env vars)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+**/.env.bak.*
+
+# Signing keys: never baked into an image (mount them as a secret, see DOCKER.md)
+keys/
+*.pem
+*.key
 
 # Vendor (will be installed during build)
 vendor/
