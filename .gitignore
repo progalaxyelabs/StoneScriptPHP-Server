@@ -15,7 +15,7 @@
 /vendor/
 /node_modules/
 # composer.lock: commit it in YOUR project (reproducible builds). The skeleton repo itself ships
-# without one so create-project resolves the newest framework 12.x patch.
+# without one so create-project resolves the newest framework 14.x release.
 
 # IDE & Editors
 /.idea/

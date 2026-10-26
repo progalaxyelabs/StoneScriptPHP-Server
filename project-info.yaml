@@ -20,13 +20,13 @@ project:
 
 technology:
   language: PHP
-  language_version: ">=8.2"
+  language_version: ">=8.5.12"
   framework: StoneScriptPHP
-  framework_version: "^12.1"
+  framework_version: "^14.0.1"
   framework_repository: https://github.com/progalaxyelabs/StoneScriptPHP
   database: PostgreSQL, reached only through the StoneScriptDB Gateway (the API never opens a database connection itself)
   authentication: JWT (RSA); auth modes builtin | external | hybrid
-  container: Docker (php:8.3-fpm-bookworm + nginx + supervisor, port 8000)
+  container: Docker (php:8.5.12-fpm-bookworm + nginx + supervisor, port 8000)
   package_manager: Composer
   testing_framework: PHPUnit ^11.0
 
@@ -59,7 +59,7 @@ cli:
 
 development:
   prerequisites:
-    - PHP >= 8.2 with openssl
+    - PHP >= 8.5.12 with openssl
     - Composer
     - A StoneScriptDB Gateway to point DB_GATEWAY_URL at
     - Docker (optional)
@@ -70,7 +70,7 @@ development:
 
 dependencies:
   runtime:
-    - progalaxyelabs/stonescriptphp: ^12.1
+    - progalaxyelabs/stonescriptphp: ^14.0.1
   development:
     - phpunit/phpunit: ^11.0
     - phpstan/phpstan: ^2.1

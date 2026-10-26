@@ -6,7 +6,7 @@
 #
 # Rebuild when StoneScriptPHP framework is updated.
 
-FROM php:8.3-cli-alpine
+FROM php:8.5.12-cli-alpine
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
@@ -20,8 +20,8 @@ WORKDIR /app
 COPY <<'EOF' composer.json
 {
     "require": {
-        "php": "^8.3",
-        "progalaxyelabs/stonescriptphp": "^12.1"
+        "php": ">=8.5.12",
+        "progalaxyelabs/stonescriptphp": "^14.0.1"
     }
 }
 EOF

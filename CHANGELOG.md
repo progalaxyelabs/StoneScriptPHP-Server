@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-10-26
+
+Major release. A new project starts on the latest framework line, `progalaxyelabs/stonescriptphp` **^14.0.1**, which
+needs **PHP >= 8.5.12**. It changes what `composer create-project` produces; it does not touch an existing project
+(those keep the framework version in their own `composer.json`).
+
+**Published history:** the last release on Packagist is **3.22.0** (framework `^5.1`, PHP `^8.2`). Versions 4.0.0 (framework
+`^9.0`) and 5.0.0 (framework `^12.1`) were never published, so for anyone who installed from Packagist, 6.0.0 follows 3.22.0 directly.
+5.0.0's changes are all part of 6.0.0 (see the 5.0.0 entry below, including the step-by-step 3.22 to 12 upgrade list).
+
+### Changed (BREAKING for new projects)
+
+- **Requires `progalaxyelabs/stonescriptphp: ^14.0.1` and `php: >=8.5.12`.** The framework refuses to install or boot on an older
+  PHP (PHP2Shell, CVE-2026-109618 / CVE-2026-109619; 13.2.1) and 14.0.0 raises the single floor to 8.5.12. Distro builds that
+  backport the fix but keep an old version number (Debian/Ubuntu `8.3.x`) are refused by design: use upstream PHP.
+  It pulls `progalaxyelabs/stonescriptdb-gateway-client ^4.0.1` (no PHP 8.5 deprecations).
+- `Dockerfile.dev`, `Dockerfile.prod` and `Dockerfile.cli` are based on PHP 8.5.12 (`php:8.5.12-fpm-bookworm`, `php:8.5.12-cli-alpine`).
+- `tests/Unit/AuthSmokeTest.php`: the probe result is read from the last stdout line. Since framework 13.1 a rejected token is logged at
+  warning level and the CLI logger writes to stdout, which broke the "whole stdout is one JSON line" assumption.
+- Verified on PHP 8.5.12 with `error_reporting=-1`: `create-project` from this tree, 32 tests green, no `E_DEPRECATED`.
+
+### What the framework 12 to 14 jump brings you (all on by default, no opt-in)
+
+- 13.2.1 PHP2Shell boot guard; 14.0.0 PHP 8.5 floor.
+- 13.0.0 PostgreSQL error text and query parameters no longer reach logs, exception messages or responses; fixes `[public:code:status]`
+  marker injection. Database `RAISE` messages must be codes (`not_found`, `user_cap`), never interpolated text.
+- 13.1.0 every handler failure is recorded in `request_logs`; failures no longer ship as HTTP 200. 13.2.0 `request_logs` is bounded
+  (retention, no probe noise): `composer update` stages `rl_purge_request_logs.pgsql` into `src/postgresql/vendor/`, activate it with
+  `php stone gateway:migrate-vendor-main`, and install the retention timer from `vendor/progalaxyelabs/stonescriptphp/contrib/systemd/`.
+- 12.x Google OAuth popup posts tokens only to allowed origins, tenant-id rule, fail-closed typed-auth defaults (see 5.0.0).
+
+### Upgrading an existing project
+
+- **From 3.22.0 (framework 5.1):** follow the 3.22 to 12 list under 5.0.0 first (routes flat format, typed auth, `TRUSTED_PROXIES`, `PublicMessage`,
+  delete your own `TokenExchangeRoute`), then:
+- **From any 12.x:** raise the PHP image/runtime to 8.5.12 or newer first (upstream build, not a distro backport), then set
+  `"php": ">=8.5.12"` and `"progalaxyelabs/stonescriptphp": "^14.0.1"` in `composer.json`, `composer update`, run `php stone env:check` as the
+  PHP-FPM user, `php stone gateway:migrate-vendor-main`, and your tests. Read the framework `CHANGELOG.md` sections 13.0.0 (error-text and
+  `RAISE` rules), 13.1.0 and 13.2.0 (retention timer) before deploying; there is no other API change in 14.0.
+- Take this release's `Dockerfile.*` base images (PHP 8.5.12). Do not backport fixes to older framework lines: the fix is the upgrade.
+
 ## [5.0.0] - 2026-10-11
 
 Major release. The framework baseline moves to `^12.1`, and a new project starts on the strict

@@ -4,7 +4,7 @@ This project ships `Dockerfile.dev` and `Dockerfile.prod` plus the `docker/` ngi
 configs they copy in. It does not ship a compose file: build this directory as one service in your own
 project-level `docker-compose.yaml`.
 
-Both images are `php:8.3-fpm-bookworm` with nginx and supervisor (Debian, not Alpine). The container
+Both images are `php:8.5.12-fpm-bookworm` with nginx and supervisor (Debian, not Alpine). The container
 listens on port 8000; `GET /health` is the health check.
 
 | | `Dockerfile.dev` | `Dockerfile.prod` |

@@ -97,7 +97,10 @@ class AuthSmokeTest extends TestCase
         $err = (string) file_get_contents($errFile);
         @unlink($errFile);
 
-        $decoded = json_decode($out, true);
+        // Since framework 13.1 a rejected token is logged at warning level, and in the CLI the logger
+        // writes to stdout: the probe's result is its LAST stdout line, not the whole stream.
+        $lines = array_values(array_filter(array_map('trim', explode("\n", $out)), 'strlen'));
+        $decoded = json_decode((string) end($lines), true);
         $this->assertIsArray($decoded, "probe produced no result in $mode mode. stdout: $out stderr: $err");
 
         return $decoded;

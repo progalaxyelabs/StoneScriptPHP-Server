@@ -1,6 +1,6 @@
 # StoneScriptPHP Server
 
-**A minimal API server skeleton for PostgreSQL-backed REST APIs on [StoneScriptPHP](https://github.com/progalaxyelabs/StoneScriptPHP) 12.**
+**A minimal API server skeleton for PostgreSQL-backed REST APIs on [StoneScriptPHP](https://github.com/progalaxyelabs/StoneScriptPHP) 14.**
 
 A clean, secure-by-default starting point: add only what you need through CLI commands.
 
@@ -12,7 +12,7 @@ A clean, secure-by-default starting point: add only what you need through CLI co
   `POST /api/auth/exchange`), driven by `src/config/auth.php` and `.env`
 - A `.env.example` in which every key is read by the framework, and in which required values are empty
   on purpose so a forgotten value stops the app at boot
-- Strict framework 12 settings for new projects (`PERSISTENCE_CONTRACT=enforced`, `DB_HYDRATION_MODE=strict`)
+- Strict framework 14 settings for new projects (`PERSISTENCE_CONTRACT=enforced`, `DB_HYDRATION_MODE=strict`)
 - Docker (nginx + PHP-FPM) for development and production, and the `stone` CLI
 
 Not included: user tables, roles and permissions, seeders. Generate or write what you need.
