@@ -5,3 +5,12 @@
 /.github                  export-ignore
 /.gitattributes           export-ignore
 /.phpunit.cache           export-ignore
+# Maintainer metadata and internal/dev files never ship in the zip.
+/project-info.yaml        export-ignore
+/CLAUDE.md                export-ignore
+/HLD.md                   export-ignore
+/SPEC.md                  export-ignore
+/*STATUS*.md              export-ignore
+/*HANDOFF*.md             export-ignore
+/test-docker*             export-ignore
+/local-tests              export-ignore
