@@ -1,0 +1,3 @@
+# Verified false positives (see docs/BUILD-2026-10-26-debrand-gate-deterministic.md). Fingerprint = [commit:]file:rule:line.
+b8741c35397e5644d1d809ea38fea41d77f29479:local-tests/07-test-jwt-auth.sh:curl-auth-header:364
+b8741c35397e5644d1d809ea38fea41d77f29479:local-tests/08-test-logging-security.sh:generic-api-key:126
